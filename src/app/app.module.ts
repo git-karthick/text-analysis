@@ -8,6 +8,7 @@ import { ResultsDisplayComponent } from './components/results-display/results-di
 import { ModelSelectorComponent } from './components/model-selector/model-selector.component';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ImageGeneratorComponent } from './components/image-generator/image-generator.component';
 
 @NgModule({
   declarations: [
@@ -15,6 +16,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
     TextInputComponent,
     ResultsDisplayComponent,
     ModelSelectorComponent,
+    ImageGeneratorComponent,
   ],
   imports: [
     BrowserModule,

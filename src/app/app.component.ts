@@ -11,7 +11,7 @@ import { Component } from '@angular/core';
       >
         <div class="px-4 py-5 sm:p-6">
           <h1 class="text-3xl font-extrabold text-gray-900 text-center mb-8">
-            Text Analysis with Groq API
+            AI Content Generator
           </h1>
           <app-model-selector
             (modelSelected)="onModelSelected($event)"
@@ -23,6 +23,9 @@ import { Component } from '@angular/core';
           <app-results-display
             [results]="analysisResults"
           ></app-results-display>
+          <app-image-generator
+            [selectedModel]="selectedModel"
+          ></app-image-generator>
         </div>
       </div>
     </div>

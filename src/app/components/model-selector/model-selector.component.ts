@@ -19,6 +19,9 @@ import { Component, Output, EventEmitter } from '@angular/core';
           <option value="llama-3.1-8b-instant">LLaMA2 8B</option>
           <option value="gemma2-9b-it">Gemma2-9B</option>
           <option value="gemma2-7b-it">Gemma2-7B</option>
+          <option value="black-forest-labs/FLUX.1-schnell">
+            FLUX.1-dev (Image Generation)
+          </option>
         </select>
         <div
           class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700"
