@@ -39,7 +39,7 @@ export class GroqService {
         },
       ],
       temperature: 0.5,
-      max_tokens: 1000,
+      max_tokens: 3000,
     };
 
     return this.http.post<any>(this.groqApiUrl, body, { headers }).pipe(

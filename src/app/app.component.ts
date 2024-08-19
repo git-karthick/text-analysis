@@ -26,6 +26,7 @@ import { Component } from '@angular/core';
           <app-image-generator
             [selectedModel]="selectedModel"
           ></app-image-generator>
+          <app-ocr />
         </div>
       </div>
     </div>

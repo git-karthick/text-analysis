@@ -9,6 +9,7 @@ import { ModelSelectorComponent } from './components/model-selector/model-select
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ImageGeneratorComponent } from './components/image-generator/image-generator.component';
+import { OcrComponent } from './components/ocr/ocr.component';
 
 @NgModule({
   declarations: [
@@ -17,6 +18,7 @@ import { ImageGeneratorComponent } from './components/image-generator/image-gene
     ResultsDisplayComponent,
     ModelSelectorComponent,
     ImageGeneratorComponent,
+    OcrComponent,
   ],
   imports: [
     BrowserModule,

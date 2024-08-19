@@ -1,1 +1,21 @@
-<p>text-input works!</p>
+<form [formGroup]="inputForm" (ngSubmit)="onSubmit()" class="space-y-6">
+  <div>
+    <label for="inputText" class="block text-sm font-medium text-gray-700 mb-2">Input Text</label>
+    <textarea formControlName="inputText" id="inputText" rows="5"
+      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
+      placeholder="Enter your text here..." (input)="updateCharCount()"></textarea>
+    <p class="mt-2 text-sm text-gray-500">
+      {{ charCount }} / {{ maxChars }} characters
+    </p>
+  </div>
+  <div class="flex space-x-4">
+    <button type="submit" [disabled]="loading || inputForm.invalid"
+      class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+      {{ loading ? 'Analyzing...' : 'Analyze' }}
+    </button>
+    <button type="button" (click)="clearText()" [disabled]="loading"
+      class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50">
+      Clear
+    </button>
+  </div>
+</form>
