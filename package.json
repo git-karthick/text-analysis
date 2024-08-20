@@ -30,6 +30,7 @@
     "@angular-devkit/build-angular": "^18.2.0",
     "@angular/cli": "^18.2.0",
     "@angular/compiler-cli": "^18.2.0",
+    "@gradio/client": "^1.5.0",
     "@types/jasmine": "~5.1.0",
     "jasmine-core": "~5.2.0",
     "karma": "~6.4.0",
@@ -38,5 +39,19 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "typescript": "~5.5.2"
+  },
+  "browser": {
+    "http": false,
+    "https": false,
+    "url": false,
+    "util": false,
+    "crypto": false,
+    "tls": false,
+    "net": false,
+    "stream": false,
+    "os": false,
+    "zlib": false,
+    "fs": false,
+    "path": false
   }
 }

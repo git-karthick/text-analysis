@@ -43,7 +43,10 @@ export class GroqService {
     };
 
     return this.http.post<any>(this.groqApiUrl, body, { headers }).pipe(
-      map((response) => response.choices[0].message.content),
+      map((response) => {
+        //console.log('Groq API Response:', response);
+        return response.choices[0].message.content;
+      }),
       catchError((error) => {
         console.error('Error occurred:', error);
         throw new Error('Failed to analyze content. Please try again later.');
