@@ -1,26 +1,41 @@
 import { Component } from '@angular/core';
-import { FlorenceService } from '../../services/florence.service';
+import { Phi35VisionService } from '../../services/phi35-vision.service';
 
 @Component({
   selector: 'app-ocr',
   template: `
-    <div
-      class="max-w-2xl mx-auto mt-10 p-8 bg-gradient-to-br from-indigo-50 to-blue-100 rounded-2xl shadow-2xl"
-    >
-      <h2 class="text-3xl font-bold mb-6 text-indigo-800">
+    <div class="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-2xl shadow-2xl">
+      <h2 class="text-3xl font-bold mb-6 text-indigo-800 text-center">
         Extract Text from Image
       </h2>
-      <input
-        type="file"
-        (change)="onFileSelected($event)"
-        accept="image/*"
-        class="mb-6 block w-full text-sm text-gray-500
+      <div class="mb-6">
+        <label for="inputText" class="block text-sm font-medium text-gray-700">
+          Enter Text (Optional)
+        </label>
+        <input
+          id="inputText"
+          type="text"
+          [(ngModel)]="inputText"
+          class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="Enter text here (optional)"
+        />
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700"
+          >Upload Image</label
+        >
+        <input
+          type="file"
+          (change)="onFileSelected($event)"
+          accept="image/*"
+          class="mt-1 block w-full text-sm text-gray-500
                file:mr-4 file:py-2 file:px-4
                file:rounded-full file:border-0
                file:text-sm file:font-semibold
                file:bg-indigo-500 file:text-white
                hover:file:bg-indigo-600 transition-colors duration-200"
-      />
+        />
+      </div>
       <div *ngIf="isLoading" class="mb-6 text-indigo-600">
         <p class="font-semibold">Processing image...</p>
         <p *ngIf="compressionMessage" class="text-sm text-indigo-400 mt-2">
@@ -34,7 +49,7 @@ import { FlorenceService } from '../../services/florence.service';
         <h3 class="text-2xl font-semibold mb-4 text-indigo-800">
           Extracted Text:
         </h3>
-        <div class="bg-white p-6 rounded-lg shadow-inner">
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner">
           <p class="text-gray-800 whitespace-pre-wrap font-mono">
             {{ extractedText }}
           </p>
@@ -59,6 +74,24 @@ import { FlorenceService } from '../../services/florence.service';
       </div>
     </div>
   `,
+  styles: [
+    `
+      input[type='file']::file-selector-button {
+        border: none;
+        padding: 0.5rem 1rem;
+        margin-right: 0.5rem;
+        background-color: #6366f1;
+        color: white;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: background-color 0.2s ease-in-out;
+      }
+
+      input[type='file']::file-selector-button:hover {
+        background-color: #4f46e5;
+      }
+    `,
+  ],
 })
 export class OcrComponent {
   extractedText: string = '';
@@ -66,8 +99,9 @@ export class OcrComponent {
   error: string = '';
   compressionMessage: string = '';
   isCopied: boolean = false;
+  inputText: string = ''; // Added input text property
 
-  constructor(private visionService: FlorenceService) {}
+  constructor(private visionService: Phi35VisionService) {}
 
   onFileSelected(event: any) {
     const file = event.target.files[0];
@@ -75,23 +109,27 @@ export class OcrComponent {
       this.isLoading = true;
       this.error = '';
       this.extractedText = '';
-      this.compressionMessage = 'Compressing image...';
+      this.compressionMessage = 'Processing image...';
       this.isCopied = false;
 
-      this.visionService.extractText(file).subscribe({
-        next: (text) => {
-          this.extractedText = text;
+      // Convert the selected file to a Blob URL
+      const imageUrl = URL.createObjectURL(file);
+
+      // Call the Phi35VisionService with the input text
+      this.visionService.predict(imageUrl, this.inputText).then(
+        (result) => {
+          this.extractedText = result;
           this.isLoading = false;
           this.compressionMessage = '';
         },
-        error: (err) => {
+        (err) => {
           console.error('Error extracting text:', err);
           this.error =
             'An error occurred while processing the image. Please try a smaller image or one with clearer text.';
           this.isLoading = false;
           this.compressionMessage = '';
-        },
-      });
+        }
+      );
     }
   }
 
