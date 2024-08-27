@@ -1,1 +1,87 @@
-<p>ocr works!</p>
+<div class="max-w-3xl mx-auto mt-12 p-8 bg-gray-50 rounded-lg shadow-lg">
+  <h2 class="text-4xl font-bold mb-8 text-indigo-800 text-center">
+    Extract Text from Image
+  </h2>
+
+  <!-- Model Selection Dropdown -->
+  <div class="mb-8">
+    <label for="modelSelect" class="block text-lg font-semibold text-gray-700 mb-2">
+      Select Model
+    </label>
+    <select id="modelSelect" [(ngModel)]="selectedModel"
+      class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+      <option *ngFor="let model of models" [value]="model">{{ model }}</option>
+    </select>
+  </div>
+
+  <!-- Input Text -->
+  <div class="mb-8">
+    <label for="inputText" class="block text-lg font-semibold text-gray-700 mb-2">
+      Enter Text (Optional)
+    </label>
+    <input id="inputText" type="text" [(ngModel)]="inputText"
+      class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+      placeholder="Enter text here (optional)" />
+  </div>
+
+  <!-- Upload Image -->
+  <div class="mb-8">
+    <label class="block text-lg font-semibold text-gray-700 mb-2">
+      Upload Image
+    </label>
+    <input type="file" (change)="onFileSelected($event)" accept="image/*" class="block w-full text-sm text-gray-500
+               file:mr-4 file:py-3 file:px-6
+               file:rounded-lg file:border-0
+               file:text-sm file:font-semibold
+               file:bg-indigo-500 file:text-white
+               hover:file:bg-indigo-600 transition-colors duration-200" />
+  </div>
+
+  <!-- Display Selected Image -->
+  <div *ngIf="imageUrl" class="mb-8">
+    <img [src]="imageUrl" alt="Selected Image" class="w-full h-auto rounded-lg shadow-md" />
+  </div>
+
+  <!-- Processing Indicator -->
+  <div *ngIf="isLoading" class="mb-8 text-indigo-600">
+    <p class="font-semibold">Processing image...</p>
+    <p *ngIf="compressionMessage" class="text-sm text-indigo-400 mt-2">
+      {{ compressionMessage }}
+    </p>
+    <div class="mt-4 h-2 w-full bg-indigo-200 rounded-full overflow-hidden">
+      <div class="h-full bg-indigo-600 animate-pulse"></div>
+    </div>
+  </div>
+
+  <!-- Extracted Text -->
+  <div *ngIf="extractedText" class="mt-8">
+    <h3 class="text-2xl font-semibold mb-4 text-indigo-800">
+      Extracted Text:
+    </h3>
+    <div class="bg-white p-6 rounded-lg shadow-inner">
+      <p class="text-gray-800 whitespace-pre-wrap font-mono">
+        {{ extractedText }}
+      </p>
+    </div>
+    <button (click)="copyToClipboard()"
+      class="mt-6 px-4 py-3 font-semibold rounded-lg shadow flex items-center transition-colors duration-200" [ngClass]="{
+        'bg-indigo-500 text-white hover:bg-indigo-600': !isCopied,
+        'bg-green-500 text-white': isCopied
+      }">
+      <span *ngIf="!isCopied" class="mr-2">
+        <i class="fas fa-copy"></i> <!-- FontAwesome Copy Icon -->
+      </span>
+      <span *ngIf="isCopied" class="mr-2">
+        <i class="fas fa-check"></i> <!-- FontAwesome Check Icon -->
+      </span>
+      {{ isCopied ? 'Copied!' : 'Copy' }}
+    </button>
+  </div>
+
+
+  <!-- Error Message -->
+  <div *ngIf="error" class="mt-8 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded">
+    <p class="font-bold">Error</p>
+    <p>{{ error }}</p>
+  </div>
+</div>

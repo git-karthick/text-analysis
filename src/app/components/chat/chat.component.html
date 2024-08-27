@@ -1,0 +1,41 @@
+<div class="max-w-5xl mx-auto mt-12 p-8 bg-white rounded-lg shadow-lg">
+  <div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">AI Assistant</h2>
+    <button (click)="startNewChat()"
+      class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200">
+      <i class="fas fa-plus mr-2"></i>New Chat
+    </button>
+  </div>
+
+  <!-- Conversation Display -->
+  <div #chatContainer class="mb-8 bg-gray-50 p-6 rounded-lg shadow-inner max-h-96 overflow-y-auto">
+    <div *ngFor="let message of messages" class="mb-4">
+      <div [ngClass]="{ 'text-right': message.sender === 'user' }">
+        <span class="text-sm text-gray-500 mb-1 block">
+          {{ message.sender === 'user' ? 'You' : 'AI Assistant' }}
+        </span>
+        <div [innerHTML]="message.text" [ngClass]="{
+            'bg-blue-100 text-blue-800': message.sender === 'user',
+            'bg-gray-100 text-gray-800': message.sender === 'assistant',
+            'p-4 rounded-lg text-base font-mono': message.isCode,
+            'p-4 rounded-lg text-base': !message.isCode
+          }"></div>
+      </div>
+    </div>
+    <div *ngIf="loading" class="text-center text-gray-500 mt-4">
+      <span class="inline-block animate-pulse">Thinking...</span>
+    </div>
+  </div>
+
+  <!-- Text Input -->
+  <form (submit)="handleUserInput($event)" class="mt-4">
+    <div class="relative">
+      <textarea id="inputText" rows="2" placeholder="Ask me anything..."
+        class="w-full pr-12 shadow-sm focus:ring-blue-500 focus:border-blue-500 block sm:text-sm border border-gray-300 rounded-md p-2 resize-none"></textarea>
+      <button type="submit" [disabled]="loading"
+        class="absolute right-2 bottom-2 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+  </form>
+</div>

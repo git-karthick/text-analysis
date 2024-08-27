@@ -92,6 +92,6 @@ export class ImageGeneratorComponent implements OnInit {
     }
   }
   updateCharCount() {
-    this.charCount = this.imageForm.get('inputText')?.value.length || 0;
+    this.charCount = this.imageForm.get('prompt')?.value.length || 0;
   }
 }

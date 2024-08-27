@@ -10,6 +10,7 @@ import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ImageGeneratorComponent } from './components/image-generator/image-generator.component';
 import { OcrComponent } from './components/ocr/ocr.component';
+import { ChatComponent } from './components/chat/chat.component';
 
 @NgModule({
   declarations: [
@@ -19,6 +20,7 @@ import { OcrComponent } from './components/ocr/ocr.component';
     ModelSelectorComponent,
     ImageGeneratorComponent,
     OcrComponent,
+    ChatComponent,
   ],
   imports: [
     BrowserModule,
