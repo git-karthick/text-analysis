@@ -31,7 +31,8 @@ export class GroqService {
       messages: [
         {
           role: 'system',
-          content: 'You are an AI assistant that analyzes text content.',
+          content:
+            'You are an AI assistant that can understand and respond to various types of input.',
         },
         {
           role: 'user',

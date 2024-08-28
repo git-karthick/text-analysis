@@ -4,12 +4,12 @@ import { Component } from '@angular/core';
   selector: 'app-root',
   template: `
     <div
-      class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8"
+      class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-6 px-4 sm:py-12 sm:px-6 lg:px-8"
     >
       <div class="max-w-7xl mx-auto">
-        <div class="text-center mb-12">
+        <div class="text-center mb-8 sm:mb-12">
           <h1
-            class="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl"
+            class="text-3xl font-extrabold text-gray-900 sm:text-4xl md:text-5xl"
           >
             AI Content <span class="text-indigo-600">Assistant</span>
           </h1>
@@ -21,24 +21,24 @@ import { Component } from '@angular/core';
           </p>
         </div>
 
-        <div class="bg-white shadow-2xl rounded-lg overflow-hidden">
-          <div class="p-6 sm:p-10">
+        <div class="bg-white shadow-xl rounded-lg overflow-hidden">
+          <div class="p-4 sm:p-6 md:p-8">
             <app-model-selector
               (modelSelected)="onModelSelected($event)"
-              class="mb-8"
+              class="mb-6 sm:mb-8"
             ></app-model-selector>
 
-            <div class="space-y-10">
+            <div class="space-y-6 sm:space-y-8">
               <ng-container *ngIf="selectedModel">
-                <div class="bg-gray-50 rounded-lg p-6">
-                  <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                <div class="bg-gray-50 rounded-lg p-4 sm:p-6">
+                  <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
                     Chat Assistant
                   </h2>
                   <app-chat [selectedModel]="selectedModel"></app-chat>
                 </div>
 
-                <div class="bg-gray-50 rounded-lg p-6">
-                  <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                <div class="bg-gray-50 rounded-lg p-4 sm:p-6">
+                  <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
                     Image Generator
                   </h2>
                   <app-image-generator
@@ -47,8 +47,8 @@ import { Component } from '@angular/core';
                 </div>
               </ng-container>
 
-              <div class="bg-gray-50 rounded-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-900 mb-4">
+              <div class="bg-gray-50 rounded-lg p-4 sm:p-6">
+                <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
                   OCR (Optical Character Recognition)
                 </h2>
                 <app-ocr></app-ocr>

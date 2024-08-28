@@ -1,13 +1,14 @@
 import {
+  AfterViewChecked,
   Component,
+  ElementRef,
   Input,
   OnInit,
   ViewChild,
-  ElementRef,
-  AfterViewChecked,
 } from '@angular/core';
 import { GroqService } from '../../services/groq.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import Prism from 'prismjs';
 
 interface Message {
   text: string | SafeHtml;
@@ -40,6 +41,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   ngAfterViewChecked() {
     this.scrollToBottom();
+    Prism.highlightAll(); // Apply PrismJS highlighting
   }
 
   scrollToBottom(): void {
@@ -88,11 +90,13 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.groqService.analyzeContent(prompt, this.selectedModel).subscribe(
       (result) => {
         const isCode = result.includes('```') || result.includes('<code>');
-        const sanitizedText = this.sanitizer.bypassSecurityTrustHtml(
-          this.formatResponse(result)
-        );
+        const formattedText = this.formatResponse(result);
 
-        this.addMessage({ text: sanitizedText, sender: 'assistant', isCode });
+        this.addMessage({
+          text: this.sanitizer.bypassSecurityTrustHtml(formattedText),
+          sender: 'assistant',
+          isCode,
+        });
         this.loading = false;
       },
       (error) => {
@@ -108,10 +112,25 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   formatResponse(response: string): string {
     return response
-      .replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>')
-      .replace(/\n/g, '<br/>');
+      .replace(
+        /```([\s\S]*?)```/g,
+        (match, p1) =>
+          `<pre><code class="language-javascript">${this.escapeHtml(
+            p1.trim()
+          )}</code></pre>`
+      )
+      .replace(/`([^`]+)`/g, '<code>$1</code>'); // Handle inline code
   }
 
+  // Helper function to escape HTML in code blocks
+  escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
   startNewChat() {
     this.messages = [];
     this.conversationContext = '';
