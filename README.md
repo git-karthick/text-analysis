@@ -226,3 +226,136 @@ app.UseExceptionHandler(errorApp =>
 5. **Centralized Logic**: One handler for all role-based authorization
 
 This solution provides a secure, performant way to handle role-based authorization using user IDs from request bodies while maintaining code reusability across controllers.
+
+
+Here's a **project structure** optimized for Dapper instead of Entity Framework, while keeping the same authorization flow:
+
+```plaintext
+YourApiProject/
+├── Controllers/               # API controllers
+│   ├── OrdersController.cs
+│   └── ProductsController.cs
+├── Authorization/            # Custom auth components
+│   ├── AuthorizeRolesAttribute.cs
+│   ├── RolesAuthorizationHandler.cs
+│   └── RolesRequirement.cs
+├── Services/                 # Business logic services
+│   ├── UserRoleService.cs
+│   └── IUserRoleService.cs
+├── Data/                     # Dapper-related classes
+│   ├── DapperContext.cs      # Database connection handler
+│   ├── Queries/              # SQL queries
+│   │   └── UserQueries.sql
+│   └── Models/               # Database models
+│       ├── User.cs
+│       └── Role.cs
+├── Requests/                 # Request DTOs
+│   └── CreateOrderRequest.cs
+├── appsettings.json
+└── Program.cs
+```
+
+### Key Changes for Dapper:
+
+**1. `Data/DapperContext.cs`** (Replaces Entity Framework DbContext):
+```csharp
+public class DapperContext
+{
+    private readonly IConfiguration _configuration;
+    
+    public DapperContext(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public IDbConnection CreateConnection() 
+        => new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+}
+```
+
+**2. Updated `Services/UserRoleService.cs`** (Dapper Implementation):
+```csharp
+public class UserRoleService : IUserRoleService
+{
+    private readonly DapperContext _context;
+    private readonly IMemoryCache _cache;
+
+    public UserRoleService(DapperContext context, IMemoryCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
+
+    public async Task<List<string>> GetUserRoles(int userId)
+    {
+        return await _cache.GetOrCreateAsync($"UserRoles_{userId}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+            
+            using var connection = _context.CreateConnection();
+            
+            const string sql = """
+                SELECT r.Name 
+                FROM Users u
+                INNER JOIN UserRoles ur ON u.Id = ur.UserId
+                INNER JOIN Roles r ON ur.RoleId = r.Id
+                WHERE u.Id = @UserId
+                """;
+                
+            var roles = await connection.QueryAsync<string>(sql, new { UserId = userId });
+            return roles.ToList();
+        });
+    }
+}
+```
+
+**3. `Data/Queries/UserQueries.sql`** (Optional - SQL Query Management):
+```sql
+-- GetUserRoles
+SELECT r.Name 
+FROM Users u
+INNER JOIN UserRoles ur ON u.Id = ur.UserId
+INNER JOIN Roles r ON ur.RoleId = r.Id
+WHERE u.Id = @UserId
+```
+
+**4. Updated `Program.cs` Registration**:
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Dapper configuration
+builder.Services.AddSingleton<DapperContext>();
+builder.Services.AddScoped<IUserRoleService, UserRoleService>();
+
+// Rest remains same as previous authorization setup
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RolesPolicy:*", policy => 
+        policy.Requirements.Add(new RolesRequirement(Array.Empty<string>()));
+});
+builder.Services.AddSingleton<IAuthorizationHandler, RolesAuthorizationHandler>();
+
+var app = builder.Build();
+// ... rest of middleware
+```
+
+### Key Structural Differences from EF Version:
+1. **Removed** Entity Framework migrations and `AppDbContext`
+2. **Added** `DapperContext` for connection management
+3. **Simplified Models** - No EF navigation properties needed
+4. **Query Management** - Optional SQL files for better query organization
+5. **Direct SQL** in service layer using Dapper's `QueryAsync`
+
+### Security Considerations:
+1. **SQL Injection Protection**:  
+   Always use parameterized queries with Dapper (as shown in the `GetUserRoles` method)
+
+2. **Connection Management**:  
+   The `DapperContext` ensures proper connection disposal
+
+3. **Caching Strategy**:  
+   MemoryCache is still valid, but consider Redis for distributed scenarios
+
+This structure maintains the authorization flow while being more lightweight with Dapper. The authorization handler (`RolesAuthorizationHandler`) remains unchanged from the previous solution, demonstrating proper separation of concerns.
