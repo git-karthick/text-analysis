@@ -760,3 +760,184 @@ builder.Services.AddHttpContextAccessor();
 5. Access granted if any match exists
 
 This implementation properly uses only the user ID to fetch roles while maintaining your role model structure and providing efficient authorization checks.
+
+
+Here's the **modified implementation** where `GetUser` returns a complete `User` object with roles, using Dapper for database access:
+
+```csharp
+// Models
+public class User
+{
+    public int UserId { get; set; }
+    public string UserName { get; set; }
+    public List<Role> Roles { get; set; } = new();
+}
+
+public class Role
+{
+    public int RoleId { get; set; }
+    public string RoleName { get; set; }
+}
+
+// Service Interface
+public interface IUserService
+{
+    Task<User> GetUser(int userId);
+}
+
+// Dapper Implementation
+public class UserService : IUserService
+{
+    private readonly DapperContext _context;
+    private readonly IMemoryCache _cache;
+
+    public UserService(DapperContext context, IMemoryCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
+
+    public async Task<User> GetUser(int userId)
+    {
+        return await _cache.GetOrCreateAsync($"User_{userId}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+            
+            using var connection = _context.CreateConnection();
+            
+            const string sql = """
+                SELECT u.UserId, u.UserName, r.RoleId, r.RoleName 
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserId = ur.UserId
+                LEFT JOIN Roles r ON ur.RoleId = r.RoleId
+                WHERE u.UserId = @UserId
+                """;
+
+            var userRoles = new Dictionary<int, User>();
+            
+            await connection.QueryAsync<User, Role, User>(
+                sql,
+                (user, role) => 
+                {
+                    if (!userRoles.TryGetValue(user.UserId, out var currentUser))
+                    {
+                        currentUser = user;
+                        userRoles.Add(user.UserId, currentUser);
+                    }
+                    if (role != null) currentUser.Roles.Add(role);
+                    return currentUser;
+                },
+                new { UserId = userId },
+                splitOn: "RoleId"
+            );
+
+            return userRoles.Values.FirstOrDefault() ?? new User { UserId = userId };
+        });
+    }
+}
+
+// Updated Authorization Handler
+public class RolesAuthorizationHandler : AuthorizationHandler<RolesRequirement>
+{
+    private readonly IUserService _userService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public RolesAuthorizationHandler(
+        IUserService userService,
+        IHttpContextAccessor httpContextAccessor)
+    {
+        _userService = userService;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    protected override async Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        RolesRequirement requirement)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        var userId = await ExtractUserIdFromRequestBody(httpContext.Request);
+
+        if (userId == 0)
+        {
+            context.Fail();
+            return;
+        }
+
+        var user = await _userService.GetUser(userId);
+        var hasRequiredRole = user.Roles.Any(r => 
+            requirement.RequiredRoleNames.Contains(r.RoleName));
+
+        if (hasRequiredRole) context.Succeed(requirement);
+    }
+
+    private async Task<int> ExtractUserIdFromRequestBody(HttpRequest request)
+    {
+        try
+        {
+            request.EnableBuffering();
+            using var reader = new StreamReader(request.Body, Encoding.UTF8);
+            var body = await reader.ReadToEndAsync();
+            request.Body.Position = 0;
+
+            var json = JObject.Parse(body);
+            return json["userId"]?.Value<int>() ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+}
+
+// Updated Program.cs Registration
+var builder = WebApplication.CreateBuilder(args);
+
+// Dapper configuration
+builder.Services.AddSingleton<DapperContext>();
+builder.Services.AddScoped<IUserService, UserService>();
+
+// Authorization setup
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, RolesPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, RolesAuthorizationHandler>();
+
+// Other services
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+```
+
+Key changes from previous implementation:
+
+1. **New User Service**:
+   - Returns complete `User` object with roles
+   - Uses Dapper multi-mapping to handle user+role relationships
+   - Caches entire user object with roles
+
+2. **Modified Authorization Handler**:
+   - Uses `IUserService` instead of `IUserRoleService`
+   - Checks roles from user.Roles collection
+   - Maintains same authorization logic but works with full user object
+
+3. **Optimized SQL Query**:
+   - Single query to fetch user with roles using JOINs
+   - Uses Dapper's multi-mapping feature to map results to objects
+
+4. **Improved Caching**:
+   - Caches entire user object with roles
+   - Reduces database calls for subsequent requests
+
+Usage remains the same in controllers:
+```csharp
+[HttpPost("admin-action")]
+[AuthorizeRoles("Admin", "SuperUser")]
+public IActionResult AdminEndpoint([FromBody] UserRequest request)
+{
+    // Your action logic
+}
+```
+
+This implementation:
+1. Fully encapsulates user data fetching
+2. Maintains role-based authorization logic
+3. Provides better data consistency by working with complete user objects
+4. Uses Dapper's efficient mapping for relational data
+5. Reduces database roundtrips through caching
