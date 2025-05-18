@@ -598,3 +598,165 @@ public IActionResult AdminAction([FromBody] AdminRequest request)
 4. Database queries optimized with Dapper and caching
 
 This implementation provides a robust role system using your model class while maintaining performance and security.
+
+
+Here's the **corrected implementation** that only uses the user ID to fetch roles and compares against role names, while maintaining your `Role` class structure:
+
+### 1. Simplified `RolesRequirement`
+```csharp
+public class RolesRequirement : IAuthorizationRequirement
+{
+    public string[] RequiredRoleNames { get; }
+    
+    public RolesRequirement(params string[] roleNames)
+    {
+        RequiredRoleNames = roleNames;
+    }
+}
+```
+
+### 2. Updated `RolesPolicyProvider`
+```csharp
+public class RolesPolicyProvider : IAuthorizationPolicyProvider
+{
+    private readonly DefaultAuthorizationPolicyProvider _fallbackProvider;
+
+    public RolesPolicyProvider(IOptions<AuthorizationOptions> options)
+    {
+        _fallbackProvider = new DefaultAuthorizationPolicyProvider(options);
+    }
+
+    public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
+    {
+        if (policyName.StartsWith("RolesPolicy:", StringComparison.OrdinalIgnoreCase))
+        {
+            var roleNames = policyName["RolesPolicy:".Length..]
+                .Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            var policy = new AuthorizationPolicyBuilder()
+                .AddRequirements(new RolesRequirement(roleNames))
+                .Build();
+
+            return Task.FromResult<AuthorizationPolicy?>(policy);
+        }
+        return _fallbackProvider.GetPolicyAsync(policyName);
+    }
+
+    // Keep other interface implementations
+}
+```
+
+### 3. Optimized `RolesAuthorizationHandler`
+```csharp
+public class RolesAuthorizationHandler : AuthorizationHandler<RolesRequirement>
+{
+    private readonly IUserRoleService _roleService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public RolesAuthorizationHandler(
+        IUserRoleService roleService,
+        IHttpContextAccessor httpContextAccessor)
+    {
+        _roleService = roleService;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    protected override async Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        RolesRequirement requirement)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        var userId = await ExtractUserIdFromRequestBody(httpContext.Request);
+
+        if (userId == 0)
+        {
+            context.Fail();
+            return;
+        }
+
+        // Get full Role objects using ONLY user ID
+        var userRoles = await _roleService.GetUserRoles(userId);
+        
+        // Check if any role names match
+        var hasRequiredRole = userRoles
+            .Any(ur => requirement.RequiredRoleNames.Contains(ur.RoleName));
+
+        if (hasRequiredRole)
+        {
+            context.Succeed(requirement);
+        }
+    }
+
+    private async Task<int> ExtractUserIdFromRequestBody(HttpRequest request)
+    {
+        // Same extraction logic as before
+    }
+}
+```
+
+### 4. Updated `UserRoleService` with Dapper
+```csharp
+public class UserRoleService : IUserRoleService
+{
+    private readonly DapperContext _context;
+    private readonly IMemoryCache _cache;
+
+    public async Task<List<Role>> GetUserRoles(int userId)
+    {
+        return await _cache.GetOrCreateAsync($"UserRoles_{userId}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+            
+            using var connection = _context.CreateConnection();
+            const string sql = """
+                SELECT r.RoleId, r.RoleName 
+                FROM UserRoles ur
+                INNER JOIN Roles r ON ur.RoleId = r.RoleId
+                WHERE ur.UserId = @userId
+                """;
+                
+            return (await connection.QueryAsync<Role>(sql, new { userId }))
+                .ToList();
+        });
+    }
+}
+```
+
+### 5. Simplified `Program.cs`
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Dapper configuration
+builder.Services.AddSingleton<DapperContext>();
+builder.Services.AddScoped<IUserRoleService, UserRoleService>();
+
+// Authorization setup
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, RolesPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, RolesAuthorizationHandler>();
+
+// Other services
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+```
+
+### Key Fixes:
+1. **Removed Role Name Lookup**  
+   No more database calls to resolve role names - only user ID is used to fetch roles
+
+2. **Simplified Requirement**  
+   `RolesRequirement` now only stores required role names
+
+3. **Efficient Comparison**  
+   Uses role names from requirement against role names from user's roles
+
+4. **Maintained Role Model**  
+   Still returns full `Role` objects but only compares names
+
+### Flow Summary:
+1. Client sends request with user ID in body
+2. Handler extracts user ID from request body
+3. Service gets roles **using only user ID** from DB
+4. Compares role names from DB against required names in attribute
+5. Access granted if any match exists
+
+This implementation properly uses only the user ID to fetch roles while maintaining your role model structure and providing efficient authorization checks.
