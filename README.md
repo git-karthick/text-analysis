@@ -933,3 +933,877 @@ namespace MyCompany.MyApplication.Infrastructure.Repositories.Oracle
         public async Task<Product> GetByIdAsync(int id)
         {
             try
+
+
+
+    // ========== CORE LAYER - BUSINESS LOGIC ==========
+// MyCompany.MyApplication.Core/Services/AuthorizationService.cs
+using System;
+using System.Collections.Generic;
+using System.DirectoryServices.AccountManagement;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using MyCompany.MyApplication.Domain.Models;
+using MyCompany.MyApplication.Domain.Repositories;
+using MyCompany.MyApplication.Domain.Services;
+
+namespace MyCompany.MyApplication.Core.Services
+{
+    public class AuthorizationService : IAuthorizationService
+    {
+        private readonly IUserRepository _userRepository;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthorizationService> _logger;
+
+        public AuthorizationService(
+            IUserRepository userRepository,
+            IConfiguration configuration,
+            ILogger<AuthorizationService> logger)
+        {
+            _userRepository = userRepository;
+            _configuration = configuration;
+            _logger = logger;
+        }
+
+        public async Task<bool> IsAuthorizedAsync(ClaimsPrincipal user, string permission)
+        {
+            return await IsAuthorizedAsync(user, permission, null);
+        }
+
+        public async Task<bool> IsAuthorizedAsync(ClaimsPrincipal user, string permission, string resource)
+        {
+            try
+            {
+                if (user == null || !user.Identity.IsAuthenticated)
+                {
+                    _logger.LogWarning("Authorization failed: User is not authenticated");
+                    return false;
+                }
+
+                var username = user.Identity.Name;
+                _logger.LogDebug("Checking authorization for user {Username}, permission {Permission}, resource {Resource}", 
+                    username, permission, resource);
+
+                // Get user roles (both from Windows groups and database)
+                var userRoles = await GetUserRolesAsync(username);
+
+                if (!userRoles.Any())
+                {
+                    _logger.LogWarning("User {Username} has no roles assigned", username);
+                    return false;
+                }
+
+                // Check each role for the required permission
+                foreach (var role in userRoles)
+                {
+                    var permissions = await GetRolePermissionsAsync(role);
+                    if (permissions.Contains(permission, StringComparer.OrdinalIgnoreCase))
+                    {
+                        // If resource-specific check is needed
+                        if (!string.IsNullOrEmpty(resource))
+                        {
+                            return await CheckResourcePermissionAsync(user, role, resource);
+                        }
+                        
+                        return true;
+                    }
+                }
+
+                _logger.LogInformation("User {Username} denied access to permission {Permission}", username, permission);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking authorization for user {Username}", user?.Identity?.Name);
+                return false;
+            }
+        }
+
+        public async Task<IEnumerable<string>> GetUserRolesAsync(string username)
+        {
+            try
+            {
+                var allRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // 1. Get roles from Windows groups
+                var windowsRoles = GetWindowsGroupRoles(username);
+                foreach (var role in windowsRoles)
+                {
+                    allRoles.Add(role);
+                }
+
+                // 2. Get roles from database
+                var dbUser = await _userRepository.GetByUsernameAsync(username);
+                if (dbUser != null)
+                {
+                    var activeRoles = dbUser.Roles.Where(r => r.IsActive).Select(r => r.RoleName);
+                    foreach (var role in activeRoles)
+                    {
+                        allRoles.Add(role);
+                    }
+
+                    // Update last login
+                    await _userRepository.UpdateLastLoginAsync(dbUser.Id, DateTime.UtcNow);
+                }
+
+                return allRoles;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting roles for user {Username}", username);
+                return Enumerable.Empty<string>();
+            }
+        }
+
+        public Task<IEnumerable<string>> GetRolePermissionsAsync(string role)
+        {
+            try
+            {
+                var permissions = _configuration.GetSection($"Authorization:Roles:{role}:Permissions")
+                    .Get<List<string>>();
+                
+                return Task.FromResult<IEnumerable<string>>(permissions ?? Enumerable.Empty<string>());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting permissions for role {Role}", role);
+                return Task.FromResult<IEnumerable<string>>(Enumerable.Empty<string>());
+            }
+        }
+
+        public async Task<bool> HasRoleAsync(ClaimsPrincipal user, string role)
+        {
+            var userRoles = await GetUserRolesAsync(user.Identity.Name);
+            return userRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public async Task<bool> CanAccessDepartmentDataAsync(ClaimsPrincipal user, string department)
+        {
+            try
+            {
+                // Admins can access all departments
+                if (await HasRoleAsync(user, "Admin"))
+                    return true;
+
+                // Check if user belongs to the same department
+                var dbUser = await _userRepository.GetByUsernameAsync(user.Identity.Name);
+                if (dbUser != null && dbUser.Department.Equals(department, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // Check if user has cross-department access permission
+                return await IsAuthorizedAsync(user, "AccessAllDepartments");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking department access for user {Username}", user.Identity.Name);
+                return false;
+            }
+        }
+
+        private IEnumerable<string> GetWindowsGroupRoles(string username)
+        {
+            try
+            {
+                var roleMapping = _configuration.GetSection("Authorization:RoleMapping")
+                    .GetChildren()
+                    .ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+
+                var roles = new List<string>();
+
+                using (var context = new PrincipalContext(ContextType.Domain))
+                {
+                    var userPrincipal = UserPrincipal.FindByIdentity(context, username);
+                    if (userPrincipal != null)
+                    {
+                        var groups = userPrincipal.GetAuthorizationGroups();
+                        foreach (var group in groups)
+                        {
+                            var groupName = $"{group.Context.Name}\\{group.Name}";
+                            if (roleMapping.TryGetValue(groupName, out string mappedRole))
+                            {
+                                roles.Add(mappedRole);
+                            }
+                        }
+                    }
+                }
+
+                return roles.Distinct();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting Windows group roles for user {Username}", username);
+                return Enumerable.Empty<string>();
+            }
+        }
+
+        private async Task<bool> CheckResourcePermissionAsync(ClaimsPrincipal user, string role, string resource)
+        {
+            // Implement resource-specific permission logic here
+            // For example, checking if user can access specific department data
+            if (resource.StartsWith("Department:", StringComparison.OrdinalIgnoreCase))
+            {
+                var department = resource.Substring("Department:".Length);
+                return await CanAccessDepartmentDataAsync(user, department);
+            }
+
+            return true; // Default allow if no specific resource check is implemented
+        }
+    }
+}
+
+// MyCompany.MyApplication.Core/Services/ProductService.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using MyCompany.MyApplication.Domain.Models;
+using MyCompany.MyApplication.Domain.Repositories;
+using MyCompany.MyApplication.Domain.Services;
+
+namespace MyCompany.MyApplication.Core.Services
+{
+    public class ProductService : IProductService
+    {
+        private readonly IProductRepository _productRepository;
+        private readonly ILogger<ProductService> _logger;
+
+        public ProductService(
+            IProductRepository productRepository,
+            ILogger<ProductService> logger)
+        {
+            _productRepository = productRepository;
+            _logger = logger;
+        }
+
+        public async Task<IEnumerable<Product>> GetAllProductsAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving all products");
+                return await _productRepository.GetAllAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all products");
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Product>> GetActiveProductsAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving active products");
+                return await _productRepository.GetActiveProductsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving active products");
+                throw;
+            }
+        }
+
+        public async Task<Product> GetProductByIdAsync(int id)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving product {ProductId}", id);
+                
+                if (id <= 0)
+                {
+                    throw new ArgumentException("Product ID must be greater than zero", nameof(id));
+                }
+
+                return await _productRepository.GetByIdAsync(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving product {ProductId}", id);
+                throw;
+            }
+        }
+
+        public async Task<Product> GetProductByCodeAsync(string productCode)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving product by code {ProductCode}", productCode);
+                
+                if (string.IsNullOrWhiteSpace(productCode))
+                {
+                    throw new ArgumentException("Product code cannot be empty", nameof(productCode));
+                }
+
+                return await _productRepository.GetByCodeAsync(productCode);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving product by code {ProductCode}", productCode);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Product>> GetProductsByCategoryAsync(int categoryId)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving products for category {CategoryId}", categoryId);
+                return await _productRepository.GetByCategoryAsync(categoryId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving products for category {CategoryId}", categoryId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Product>> SearchProductsAsync(string searchTerm)
+        {
+            try
+            {
+                _logger.LogInformation("Searching products with term: {SearchTerm}", searchTerm);
+                
+                if (string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    return await GetActiveProductsAsync();
+                }
+
+                return await _productRepository.SearchAsync(searchTerm);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching products with term {SearchTerm}", searchTerm);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Product>> GetLowStockProductsAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving low stock products");
+                return await _productRepository.GetLowStockProductsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving low stock products");
+                throw;
+            }
+        }
+
+        public async Task<Product> CreateProductAsync(Product product, string createdBy)
+        {
+            try
+            {
+                _logger.LogInformation("Creating new product {ProductName} by {User}", product.Name, createdBy);
+                
+                // Business validation
+                await ValidateProductAsync(product);
+                
+                // Check if product code already exists
+                var existingProduct = await _productRepository.GetByCodeAsync(product.ProductCode);
+                if (existingProduct != null)
+                {
+                    throw new InvalidOperationException($"Product with code '{product.ProductCode}' already exists");
+                }
+
+                // Set audit fields
+                product.CreatedAt = DateTime.UtcNow;
+                product.CreatedBy = createdBy;
+                product.IsActive = true;
+
+                var productId = await _productRepository.CreateAsync(product);
+                product.Id = productId;
+
+                _logger.LogInformation("Successfully created product {ProductId}", productId);
+                return product;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating product {ProductName}", product?.Name);
+                throw;
+            }
+        }
+
+        public async Task<Product> UpdateProductAsync(Product product, string updatedBy)
+        {
+            try
+            {
+                _logger.LogInformation("Updating product {ProductId} by {User}", product.Id, updatedBy);
+                
+                // Business validation
+                await ValidateProductAsync(product);
+                
+                // Check if product exists
+                var existingProduct = await _productRepository.GetByIdAsync(product.Id);
+                if (existingProduct == null)
+                {
+                    throw new InvalidOperationException($"Product with ID {product.Id} not found");
+                }
+
+                // Check if product code is being changed and if new code already exists
+                if (!existingProduct.ProductCode.Equals(product.ProductCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    var duplicateProduct = await _productRepository.GetByCodeAsync(product.ProductCode);
+                    if (duplicateProduct != null && duplicateProduct.Id != product.Id)
+                    {
+                        throw new InvalidOperationException($"Product with code '{product.ProductCode}' already exists");
+                    }
+                }
+
+                // Set audit fields
+                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedBy = updatedBy;
+
+                await _productRepository.UpdateAsync(product);
+
+                _logger.LogInformation("Successfully updated product {ProductId}", product.Id);
+                return product;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating product {ProductId}", product?.Id);
+                throw;
+            }
+        }
+
+        public async Task<bool> UpdateProductStockAsync(int productId, int quantity, string updatedBy)
+        {
+            try
+            {
+                _logger.LogInformation("Updating stock for product {ProductId} by {Quantity} units", productId, quantity);
+                
+                var product = await _productRepository.GetByIdAsync(productId);
+                if (product == null)
+                {
+                    throw new InvalidOperationException($"Product with ID {productId} not found");
+                }
+
+                if (product.Stock + quantity < 0)
+                {
+                    throw new InvalidOperationException("Cannot reduce stock below zero");
+                }
+
+                var result = await _productRepository.UpdateStockAsync(productId, product.Stock + quantity, updatedBy);
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully updated stock for product {ProductId}", productId);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating stock for product {ProductId}", productId);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeactivateProductAsync(int productId, string updatedBy)
+        {
+            try
+            {
+                _logger.LogInformation("Deactivating product {ProductId} by {User}", productId, updatedBy);
+                
+                var product = await _productRepository.GetByIdAsync(productId);
+                if (product == null)
+                {
+                    throw new InvalidOperationException($"Product with ID {productId} not found");
+                }
+
+                product.IsActive = false;
+                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedBy = updatedBy;
+
+                var result = await _productRepository.UpdateAsync(product);
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully deactivated product {ProductId}", productId);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating product {ProductId}", productId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Category>> GetCategoriesAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving all categories");
+                return await _productRepository.GetCategoriesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving categories");
+                throw;
+            }
+        }
+
+        private async Task ValidateProductAsync(Product product)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(product.Name))
+                errors.Add("Product name is required");
+
+            if (string.IsNullOrWhiteSpace(product.ProductCode))
+                errors.Add("Product code is required");
+
+            if (product.Price <= 0)
+                errors.Add("Product price must be greater than zero");
+
+            if (product.Stock < 0)
+                errors.Add("Product stock cannot be negative");
+
+            if (product.CategoryId <= 0  
+
+
+
+  // ========== DOMAIN LAYER ==========
+// MyCompany.MyApplication.Domain/Models/User.cs
+using System;
+using System.Collections.Generic;
+
+namespace MyCompany.MyApplication.Domain.Models
+{
+    public class User
+    {
+        public int Id { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string FullName { get; set; }
+        public string Department { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastLogin { get; set; }
+        public List<UserRole> Roles { get; set; } = new List<UserRole>();
+        
+        // Domain methods
+        public bool HasRole(string roleName)
+        {
+            return Roles.Any(r => r.RoleName.Equals(roleName, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        public bool IsInDepartment(string department)
+        {
+            return Department?.Equals(department, StringComparison.OrdinalIgnoreCase) == true;
+        }
+    }
+
+    public class UserRole
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public int RoleId { get; set; }
+        public string RoleName { get; set; }
+        public DateTime AssignedAt { get; set; }
+        public string AssignedBy { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        
+        public bool IsExpired => ExpiresAt.HasValue && ExpiresAt.Value < DateTime.UtcNow;
+        public bool IsActive => !IsExpired;
+    }
+
+    public class Role
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int Priority { get; set; } // Higher number = higher priority
+        public bool IsSystemRole { get; set; }
+        public List<string> Permissions { get; set; } = new List<string>();
+    }
+}
+
+// MyCompany.MyApplication.Domain/Models/Product.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace MyCompany.MyApplication.Domain.Models
+{
+    public class Product
+    {
+        public int Id { get; set; }
+        
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; }
+        
+        [StringLength(500)]
+        public string Description { get; set; }
+        
+        [Required]
+        public string ProductCode { get; set; }
+        
+        [Range(0.01, double.MaxValue)]
+        public decimal Price { get; set; }
+        
+        [Range(0, int.MaxValue)]
+        public int Stock { get; set; }
+        
+        public int CategoryId { get; set; }
+        public string CategoryName { get; set; }
+        
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public string CreatedBy { get; set; }
+        public string UpdatedBy { get; set; }
+        
+        // Domain methods
+        public bool IsInStock => Stock > 0;
+        public bool IsDiscontinued => !IsActive;
+        
+        public decimal CalculateDiscountedPrice(decimal discountPercentage)
+        {
+            if (discountPercentage < 0 || discountPercentage > 100)
+                throw new ArgumentException("Discount percentage must be between 0 and 100");
+                
+            return Price * (1 - discountPercentage / 100);
+        }
+        
+        public void UpdateStock(int quantity, string updatedBy)
+        {
+            if (Stock + quantity < 0)
+                throw new InvalidOperationException("Insufficient stock");
+                
+            Stock += quantity;
+            UpdatedAt = DateTime.UtcNow;
+            UpdatedBy = updatedBy;
+        }
+    }
+}
+
+// MyCompany.MyApplication.Domain/Models/Category.cs
+namespace MyCompany.MyApplication.Domain.Models
+{
+    public class Category
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int? ParentCategoryId { get; set; }
+        public string ParentCategoryName { get; set; }
+        public bool IsActive { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+}
+
+// MyCompany.MyApplication.Domain/Models/Order.cs (From Oracle DB)
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace MyCompany.MyApplication.Domain.Models
+{
+    public class Order
+    {
+        public int Id { get; set; }
+        public string OrderNumber { get; set; }
+        public int CustomerId { get; set; }
+        public string CustomerName { get; set; }
+        public DateTime OrderDate { get; set; }
+        public DateTime? ShippedDate { get; set; }
+        public OrderStatus Status { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal ShippingAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string ShippingAddress { get; set; }
+        public string BillingAddress { get; set; }
+        public List<OrderItem> Items { get; set; } = new List<OrderItem>();
+        
+        // Domain methods
+        public void CalculateTotals()
+        {
+            SubTotal = Items.Sum(i => i.TotalPrice);
+            TotalAmount = SubTotal + TaxAmount + ShippingAmount;
+        }
+        
+        public bool CanBeCancelled => Status == OrderStatus.Pending || Status == OrderStatus.Processing;
+        public bool IsShipped => ShippedDate.HasValue;
+        public int TotalItems => Items.Sum(i => i.Quantity);
+    }
+
+    public class OrderItem
+    {
+        public int Id { get; set; }
+        public int OrderId { get; set; }
+        public int ProductId { get; set; }
+        public string ProductName { get; set; }
+        public string ProductCode { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TotalPrice { get; set; }
+        
+        public void CalculateTotal()
+        {
+            TotalPrice = Quantity * UnitPrice;
+        }
+    }
+
+    public enum OrderStatus
+    {
+        Pending = 1,
+        Processing = 2,
+        Shipped = 3,
+        Delivered = 4,
+        Cancelled = 5,
+        Returned = 6
+    }
+}
+
+// ========== DOMAIN INTERFACES ==========
+// MyCompany.MyApplication.Domain/Repositories/IUserRepository.cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using MyCompany.MyApplication.Domain.Models;
+
+namespace MyCompany.MyApplication.Domain.Repositories
+{
+    public interface IUserRepository
+    {
+        Task<User> GetByIdAsync(int id);
+        Task<User> GetByUsernameAsync(string username);
+        Task<User> GetByEmailAsync(string email);
+        Task<IEnumerable<User>> GetAllAsync();
+        Task<IEnumerable<User>> GetByDepartmentAsync(string department);
+        Task<IEnumerable<User>> GetActiveUsersAsync();
+        Task<int> CreateAsync(User user);
+        Task<bool> UpdateAsync(User user);
+        Task<bool> DeleteAsync(int id);
+        Task<bool> DeactivateAsync(int id);
+        Task<IEnumerable<Role>> GetAllRolesAsync();
+        Task<IEnumerable<UserRole>> GetUserRolesAsync(int userId);
+        Task<bool> AssignRoleAsync(int userId, int roleId, string assignedBy);
+        Task<bool> RemoveRoleAsync(int userId, int roleId);
+        Task UpdateLastLoginAsync(int userId, DateTime lastLogin);
+    }
+}
+
+// MyCompany.MyApplication.Domain/Repositories/IProductRepository.cs
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using MyCompany.MyApplication.Domain.Models;
+
+namespace MyCompany.MyApplication.Domain.Repositories
+{
+    public interface IProductRepository
+    {
+        Task<IEnumerable<Product>> GetAllAsync();
+        Task<IEnumerable<Product>> GetActiveProductsAsync();
+        Task<Product> GetByIdAsync(int id);
+        Task<Product> GetByCodeAsync(string productCode);
+        Task<IEnumerable<Product>> GetByCategoryAsync(int categoryId);
+        Task<IEnumerable<Product>> SearchAsync(string searchTerm);
+        Task<IEnumerable<Product>> GetLowStockProductsAsync(int threshold = 10);
+        Task<int> CreateAsync(Product product);
+        Task<bool> UpdateAsync(Product product);
+        Task<bool> DeleteAsync(int id);
+        Task<bool> UpdateStockAsync(int productId, int newStock, string updatedBy);
+        Task<IEnumerable<Category>> GetCategoriesAsync();
+    }
+}
+
+// MyCompany.MyApplication.Domain/Repositories/IOrderRepository.cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using MyCompany.MyApplication.Domain.Models;
+
+namespace MyCompany.MyApplication.Domain.Repositories
+{
+    public interface IOrderRepository
+    {
+        Task<IEnumerable<Order>> GetAllAsync();
+        Task<Order> GetByIdAsync(int id);
+        Task<Order> GetByOrderNumberAsync(string orderNumber);
+        Task<IEnumerable<Order>> GetByCustomerAsync(int customerId);
+        Task<IEnumerable<Order>> GetByStatusAsync(OrderStatus status);
+        Task<IEnumerable<Order>> GetByDateRangeAsync(DateTime startDate, DateTime endDate);
+        Task<int> CreateAsync(Order order);
+        Task<bool> UpdateAsync(Order order);
+        Task<bool> UpdateStatusAsync(int orderId, OrderStatus status);
+        Task<bool> DeleteAsync(int id);
+        Task<decimal> GetTotalSalesAsync(DateTime startDate, DateTime endDate);
+        Task<IEnumerable<Order>> GetRecentOrdersAsync(int count = 50);
+    }
+}
+
+// MyCompany.MyApplication.Domain/Services/IAuthorizationService.cs
+using System.Collections.Generic;
+using System.Security.Claims;
+using System.Threading.Tasks;
+
+namespace MyCompany.MyApplication.Domain.Services
+{
+    public interface IAuthorizationService
+    {
+        Task<bool> IsAuthorizedAsync(ClaimsPrincipal user, string permission);
+        Task<bool> IsAuthorizedAsync(ClaimsPrincipal user, string permission, string resource);
+        Task<IEnumerable<string>> GetUserRolesAsync(string username);
+        Task<IEnumerable<string>> GetRolePermissionsAsync(string role);
+        Task<bool> HasRoleAsync(ClaimsPrincipal user, string role);
+        Task<bool> CanAccessDepartmentDataAsync(ClaimsPrincipal user, string department);
+    }
+}
+
+// MyCompany.MyApplication.Domain/Services/IProductService.cs
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using MyCompany.MyApplication.Domain.Models;
+
+namespace MyCompany.MyApplication.Domain.Services
+{
+    public interface IProductService
+    {
+        Task<IEnumerable<Product>> GetAllProductsAsync();
+        Task<IEnumerable<Product>> GetActiveProductsAsync();
+        Task<Product> GetProductByIdAsync(int id);
+        Task<Product> GetProductByCodeAsync(string productCode);
+        Task<IEnumerable<Product>> GetProductsByCategoryAsync(int categoryId);
+        Task<IEnumerable<Product>> SearchProductsAsync(string searchTerm);
+        Task<IEnumerable<Product>> GetLowStockProductsAsync();
+        Task<Product> CreateProductAsync(Product product, string createdBy);
+        Task<Product> UpdateProductAsync(Product product, string updatedBy);
+        Task<bool> UpdateProductStockAsync(int productId, int quantity, string updatedBy);
+        Task<bool> DeactivateProductAsync(int productId, string updatedBy);
+        Task<IEnumerable<Category>> GetCategoriesAsync();
+    }
+}
+
+// MyCompany.MyApplication.Domain/Services/IOrderService.cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using MyCompany.MyApplication.Domain.Models;
+
+namespace MyCompany.MyApplication.Domain.Services
+{
+    public interface IOrderService
+    {
+        Task<IEnumerable<Order>> GetAllOrdersAsync();
+        Task<Order> GetOrderByIdAsync(int id);
+        Task<Order> GetOrderByNumberAsync(string orderNumber);
+        Task<IEnumerable<Order>> GetCustomerOrdersAsync(int customerId);
+        Task<IEnumerable<Order>> GetOrdersByStatusAsync(OrderStatus status);
+        Task<Order> CreateOrderAsync(Order order);
+        Task<Order> UpdateOrderAsync(Order order);
+        Task<bool> CancelOrderAsync(int orderId);
+        Task<bool> ShipOrderAsync(int orderId, DateTime shippedDate);
+        Task<decimal> GetSalesReportAsync(DateTime startDate, DateTime endDate);
+        Task<IEnumerable<Order>> GetRecentOrdersAsync(int count = 50);
+    }
+}
