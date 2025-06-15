@@ -1,72 +1,60 @@
-Here's a comprehensive guide for using Chakra UI v3 with Vite and TypeScript, incorporating the latest documentation and migration insights:
+Here's how to implement the color `#8A0808` (a deep red) in Chakra UI v3 with TypeScript, including the initial color mode configuration:
 
-### Chakra UI v3 with Vite + TypeScript Setup
+### 1. Custom Theme with Color `#8A0808`
 
-#### 1. Create Project & Install Dependencies
-```bash
-npm create vite@latest chakra-v3-app -- --template react-ts
-cd chakra-v3-app
-npm install @chakra-ui/react@latest @emotion/react
-```
-
-Key changes from v2:
-- Removed `@emotion/styled` and `framer-motion` dependencies 
-- New component architecture with namespaced imports 
-
-#### 2. Custom Theme Configuration (TypeScript)
-Create `src/theme/index.ts`:
 ```typescript
+// src/theme/index.ts
 import { createSystem, defaultConfig } from "@chakra-ui/react"
 
 export const system = createSystem(defaultConfig, {
   theme: {
     tokens: {
       colors: {
-        brand: {
-          50: { value: "#e6f2ff" },
-          500: { value: "#3b82f6" },
-          900: { value: "#001a33" }
+        deepRed: {
+          50: { value: "#fde8e8" },
+          100: { value: "#f9c5c5" },
+          200: { value: "#f5a3a3" },
+          300: { value: "#f18080" },
+          400: { value: "#ed5d5d" },
+          500: { value: "#8A0808" }, // Your requested color
+          600: { value: "#6e0606" },
+          700: { value: "#520505" },
+          800: { value: "#360303" },
+          900: { value: "#1a0101" }
         }
-      },
-      fonts: {
-        heading: { value: "'Inter', sans-serif" },
-        body: { value: "'Inter', sans-serif" }
       }
     },
     semanticTokens: {
       colors: {
-        brand: {
-          solid: { value: "{colors.brand.500}" },
-          contrast: { value: "white" }
+        primary: {
+          default: { value: "{colors.deepRed.500}" },
+          _dark: { value: "{colors.deepRed.300}" }
         }
       }
     },
     recipes: {
       button: {
-        base: {
-          fontWeight: "bold",
-          borderRadius: "md"
-        },
         variants: {
-          solid: {
-            bg: "brand.solid",
-            color: "brand.contrast"
+          primary: {
+            bg: "primary",
+            color: "white",
+            _hover: { bg: "{colors.deepRed.600}" }
           }
         }
       }
     }
+  },
+  colorMode: {
+    initial: "dark", // 'light' | 'dark' | 'system'
+    useSystemColorMode: false
   }
 })
 ```
 
-Key differences from v2:
-- Uses `createSystem` instead of `extendTheme` 
-- Component styles now use "recipes" instead of `styleConfig` 
-- Color system requires both `tokens` and `semanticTokens` 
+### 2. Provider Setup with Color Mode
 
-#### 3. Provider Setup
-Update `src/main.tsx`:
 ```tsx
+// src/main.tsx
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ChakraProvider } from '@chakra-ui/react'
@@ -82,82 +70,60 @@ createRoot(document.getElementById('root')!).render(
 )
 ```
 
-Key changes:
-- `theme` prop renamed to `value` 
-- Color mode handling moved to external libraries 
+### 3. Component Usage Example
 
-#### 4. Component Usage Example
 ```tsx
-import { Button, Box, Text } from '@chakra-ui/react'
+// src/App.tsx
+import { Button, Box, Text, useColorMode } from '@chakra-ui/react'
 
 export default function App() {
+  const { colorMode, toggleColorMode } = useColorMode()
+  
   return (
     <Box p={8}>
-      <Text fontSize="xl">Chakra v3 + Vite</Text>
-      <Button colorPalette="brand" variant="solid">
-        New Button Syntax
+      <Text mb={4}>Current mode: {colorMode}</Text>
+      <Button 
+        colorPalette="deepRed" 
+        variant="primary"
+        onClick={toggleColorMode}
+      >
+        Toggle Mode (Current: {colorMode})
       </Button>
     </Box>
   )
 }
 ```
 
-Important changes:
-- `colorScheme` → `colorPalette` 
-- Boolean props simplified (`isDisabled` → `disabled`) 
-- Component structure changes (e.g., `<Table.Root>`) 
+### Key Features:
 
-#### 5. Additional Configuration
+1. **Color Configuration**:
+   - Full color palette generated from your base `#8A0808`
+   - Semantic token for primary color that adapts to dark/light mode
+   - Button variant using the color
 
-**For Vite:**
-Add to `vite.config.ts`:
-```typescript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+2. **Color Mode Options**:
+   - `initial: "dark"` - Default starting mode
+   - `useSystemColorMode: false` - Disable system preference
+   - Change to `"light"` or `"system"` as needed
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': '/src'
-    }
+3. **Type Safety**:
+   - All color references are type-checked
+   - Color mode values are strictly typed
+
+### Additional Notes:
+
+- For system color mode preference, set:
+  ```typescript
+  colorMode: {
+    initial: "system",
+    useSystemColorMode: true
   }
-})
-```
+  ```
 
-**For TypeScript:**
-Add to `tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "types": ["vite/client"],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
-}
-```
+- To access the color directly in components:
+  ```tsx
+  <Box bg="deepRed.500">...</Box>
+  ```
 
-### Key Migration Notes 
-
-1. **Component Changes**:
-   - New namespaced component structure (e.g., `<Tabs.Root>`)
-   - Form components replaced with `<Field>` variants
-   - Icons moved to external libraries like `react-icons`
-
-2. **Styling Changes**:
-   - CSS color-mix instead of JS `transparentize`
-   - Gradient props simplified
-   - Style config replaced with recipes
-
-3. **Deprecations**:
-   - `useColorMode` removed (use `next-themes`)
-   - Toast system replaced with snippet-based approach
-   - Animation no longer uses `framer-motion`
-
-4. **Performance**:
-   - 4x reconciliation improvement
-   - 1.6x re-render improvement
-   - Tree-shakable component recipes 
-
-For complete migration details, refer to the official [Chakra UI v3 Migration Guide](https://www.chakra-ui.com/docs/get-started/migration)  and be aware that some components may require significant refactoring due to structural changes .
+- The color palette follows Chakra's convention with 50-900 shades
+- Dark mode automatically uses lighter variants (300 instead of 500)
