@@ -1,182 +1,471 @@
-I apologize for the confusion. Let me provide a corrected solution based on Chakra UI's current stable version (v2.x) with proper theming and color mode implementation. The previous v3 references were incorrect as v3 is still in development.
+import React from ‘react’;
+import {
+ChakraProvider,
+Box,
+Flex,
+Text,
+Button,
+Menu,
+MenuButton,
+MenuList,
+MenuItem,
+IconButton,
+useColorMode,
+useColorModeValue,
+HStack,
+VStack,
+Badge,
+Avatar,
+Container,
+extendTheme,
+Input,
+InputGroup,
+InputLeftElement,
+Tooltip
+} from ‘@chakra-ui/react’;
+import {
+MoonIcon,
+SunIcon,
+ChevronDownIcon,
+BellIcon,
+SearchIcon,
+SettingsIcon
+} from ‘@chakra-ui/icons’;
 
-### Correct Implementation for Chakra UI v2.x with Vite and TypeScript
-
-#### 1. Install Dependencies
-```bash
-npm install @chakra-ui/react @emotion/react @emotion/styled framer-motion
-```
-
-#### 2. Theme Configuration
-```typescript
-// src/theme/index.ts
-import { extendTheme, type ThemeConfig } from '@chakra-ui/react';
-
-// 1. Add your color
-const colors = {
-  deepRed: {
-    50: '#fde8e8',
-    100: '#f9c5c5',
-    200: '#f5a3a3',
-    300: '#f18080',
-    400: '#ed5d5d',
-    500: '#8A0808', // Your requested color
-    600: '#6e0606',
-    700: '#520505',
-    800: '#360303',
-    900: '#1a0101',
-  },
-};
-
-// 2. Add color mode config
-const config: ThemeConfig = {
-  initialColorMode: 'dark', // 'dark' | 'light' | 'system'
-  useSystemColorMode: false,
-};
-
-// 3. Extend the theme
+// Custom theme with deep red palette
 const theme = extendTheme({
-  config,
-  colors,
-  styles: {
-    global: (props: any) => ({
-      'html, body': {
-        bg: props.colorMode === 'dark' ? 'gray.800' : 'white',
-        color: props.colorMode === 'dark' ? 'white' : 'gray.800',
-        lineHeight: 'base',
-      },
-    }),
-  },
-  components: {
-    Button: {
-      variants: {
-        primary: {
-          bg: 'deepRed.500',
-          color: 'white',
-          _hover: {
-            bg: 'deepRed.600',
-          },
-        },
-      },
-    },
-  },
+colors: {
+brand: {
+50: ‘#fdf2f2’,
+100: ‘#fce7e7’,
+200: ‘#f9d5d5’,
+300: ‘#f4b5b5’,
+400: ‘#ec8989’,
+500: ‘#dc2626’,
+600: ‘#b91c1c’,
+700: ‘#991b1b’,
+800: ‘#7f1d1d’,
+900: ‘#701a1a’,
+},
+gray: {
+50: ‘#f9fafb’,
+100: ‘#f3f4f6’,
+200: ‘#e5e7eb’,
+300: ‘#d1d5db’,
+400: ‘#9ca3af’,
+500: ‘#6b7280’,
+600: ‘#4b5563’,
+700: ‘#374151’,
+800: ‘#1f2937’,
+900: ‘#111827’,
+}
+},
+config: {
+initialColorMode: ‘light’,
+useSystemColorMode: false,
+},
+styles: {
+global: (props) => ({
+body: {
+bg: props.colorMode === ‘dark’ ? ‘gray.900’ : ‘gray.50’,
+},
+}),
+},
 });
 
-export default theme;
-```
+// Logo Component
+const Logo = ({ size = ‘md’ }) => {
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const logoSize = size === ‘lg’ ? 12 : size === ‘sm’ ? 8 : 10;
+const fontSize = size === ‘lg’ ? ‘xl’ : size === ‘sm’ ? ‘md’ : ‘lg’;
 
-#### 3. Provider Setup
-```tsx
-// src/main.tsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { ChakraProvider, ColorModeScript } from '@chakra-ui/react';
-import App from './App';
-import theme from './theme';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ChakraProvider theme={theme}>
-      {/* Required for initial color mode to work */}
-      <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-      <App />
-    </ChakraProvider>
-  </React.StrictMode>
+return (
+<Flex alignItems="center">
+<Box
+w={logoSize}
+h={logoSize}
+bg="brand.500"
+borderRadius="lg"
+display="flex"
+alignItems="center"
+justifyContent="center"
+mr={3}
+>
+<Text color="white" fontWeight="bold" fontSize={fontSize}>
+E
+</Text>
+</Box>
+<Text fontSize="xl" fontWeight="bold" color={textColor}>
+Enterprise
+</Text>
+</Flex>
 );
+};
+
+// Navigation Menu Component
+const NavigationMenu = ({ items, activeItem, onItemClick }) => {
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const hoverBg = useColorModeValue(‘gray.100’, ‘gray.700’);
+
+return (
+<HStack spacing={1}>
+{items.map((item, index) => (
+<Button
+key={index}
+variant=“ghost”
+size=“sm”
+color={activeItem === item.id ? ‘brand.500’ : textColor}
+bg={activeItem === item.id ? useColorModeValue(‘brand.50’, ‘brand.900’) : ‘transparent’}
+_hover={{ bg: hoverBg, color: ‘brand.500’ }}
+_active={{ bg: ‘brand.50’ }}
+fontWeight={activeItem === item.id ? ‘semibold’ : ‘medium’}
+onClick={() => onItemClick && onItemClick(item)}
+>
+{item.label}
+</Button>
+))}
+</HStack>
+);
+};
+
+// Search Bar Component
+const SearchBar = ({ placeholder = “Search…”, onSearch, width = “300px” }) => {
+const bgColor = useColorModeValue(‘white’, ‘gray.700’);
+const borderColor = useColorModeValue(‘gray.200’, ‘gray.600’);
+
+return (
+<InputGroup size="sm" width={width}>
+<InputLeftElement pointerEvents="none">
+<SearchIcon color="gray.400" />
+</InputLeftElement>
+<Input
+placeholder={placeholder}
+bg={bgColor}
+border=“1px solid”
+borderColor={borderColor}
+_hover={{ borderColor: ‘brand.300’ }}
+_focus={{ borderColor: ‘brand.500’, boxShadow: ‘0 0 0 1px #dc2626’ }}
+onChange={(e) => onSearch && onSearch(e.target.value)}
+/>
+</InputGroup>
+);
+};
+
+// Notification Bell Component
+const NotificationBell = ({ count = 0, onClick }) => {
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const hoverBg = useColorModeValue(‘gray.100’, ‘gray.700’);
+
+return (
+<Box position="relative">
+<Tooltip label="Notifications" placement="bottom">
+<IconButton
+icon={<BellIcon />}
+variant=“ghost”
+size=“sm”
+color={textColor}
+_hover={{ bg: hoverBg }}
+onClick={onClick}
+aria-label=“Notifications”
+/>
+</Tooltip>
+{count > 0 && (
+<Badge
+position="absolute"
+top="-1"
+right="-1"
+colorScheme="red"
+borderRadius="full"
+boxSize="18px"
+fontSize="10px"
+display="flex"
+alignItems="center"
+justifyContent="center"
+>
+{count > 99 ? ‘99+’ : count}
+</Badge>
+)}
+</Box>
+);
+};
+
+// Theme Toggle Component
+const ThemeToggle = () => {
+const { colorMode, toggleColorMode } = useColorMode();
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const hoverBg = useColorModeValue(‘gray.100’, ‘gray.700’);
+
+return (
+<Tooltip label={`Switch to ${colorMode === 'light' ? 'dark' : 'light'} mode`} placement=“bottom”>
+<IconButton
+icon={colorMode === ‘light’ ? <MoonIcon /> : <SunIcon />}
+onClick={toggleColorMode}
+variant=“ghost”
+size=“sm”
+color={textColor}
+_hover={{ bg: hoverBg }}
+aria-label=“Toggle theme”
+/>
+</Tooltip>
+);
+};
+
+// User Profile Menu Component
+const UserProfileMenu = ({ user, menuItems }) => {
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const hoverBg = useColorModeValue(‘gray.100’, ‘gray.700’);
+
+return (
+<Menu>
+<MenuButton
+as={Button}
+variant=“ghost”
+size=“sm”
+rightIcon={<ChevronDownIcon />}
+_hover={{ bg: hoverBg }}
+_active={{ bg: hoverBg }}
+>
+<HStack spacing={2}>
+<Avatar size="sm" name={user.name} src={user.avatar} bg="brand.500" />
+<VStack spacing={0} alignItems="flex-start">
+<Text fontSize="sm" fontWeight="medium" color={textColor}>
+{user.name}
+</Text>
+<Text fontSize="xs" color="gray.500">
+{user.role}
+</Text>
+</VStack>
+</HStack>
+</MenuButton>
+<MenuList>
+{menuItems.map((item, index) => (
+<MenuItem
+key={index}
+onClick={() => item.onClick && item.onClick()}
+color={item.color || textColor}
+>
+{item.label}
+</MenuItem>
+))}
+</MenuList>
+</Menu>
+);
+};
+
+// Main Header Component
+const Header = ({
+navigationItems = [],
+activeNavItem,
+onNavItemClick,
+user,
+userMenuItems = [],
+notificationCount = 0,
+onNotificationClick,
+onSearch,
+showSearch = true,
+showSettings = true
+}) => {
+const bgColor = useColorModeValue(‘white’, ‘gray.800’);
+const borderColor = useColorModeValue(‘gray.200’, ‘gray.700’);
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+const hoverBg = useColorModeValue(‘gray.100’, ‘gray.700’);
+
+return (
+<Box
+bg={bgColor}
+borderBottom="1px"
+borderColor={borderColor}
+position="sticky"
+top={0}
+zIndex={1000}
+boxShadow="sm"
+>
+<Container maxW="8xl" px={6}>
+<Flex h={16} alignItems="center" justifyContent="space-between">
+{/* Logo */}
+<Logo />
+
+```
+      {/* Navigation */}
+      <NavigationMenu 
+        items={navigationItems}
+        activeItem={activeNavItem}
+        onItemClick={onNavItemClick}
+      />
+
+      {/* Right side actions */}
+      <HStack spacing={4}>
+        {/* Search */}
+        {showSearch && (
+          <SearchBar 
+            placeholder="Search enterprise..."
+            onSearch={onSearch}
+            width="280px"
+          />
+        )}
+
+        {/* Notifications */}
+        <NotificationBell 
+          count={notificationCount}
+          onClick={onNotificationClick}
+        />
+
+        {/* Settings */}
+        {showSettings && (
+          <Tooltip label="Settings" placement="bottom">
+            <IconButton
+              icon={<SettingsIcon />}
+              variant="ghost"
+              size="sm"
+              color={textColor}
+              _hover={{ bg: hoverBg }}
+              aria-label="Settings"
+            />
+          </Tooltip>
+        )}
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
+
+        {/* User Profile */}
+        <UserProfileMenu 
+          user={user}
+          menuItems={userMenuItems}
+        />
+      </HStack>
+    </Flex>
+  </Container>
+</Box>
 ```
 
-#### 4. App Component with Theme Application
-```tsx
-// src/App.tsx
-import { Box, Button, Text, useColorMode } from '@chakra-ui/react';
+);
+};
 
-export default function App() {
-  const { colorMode, toggleColorMode } = useColorMode();
+// Layout Component
+const Layout = ({ children, headerProps }) => {
+return (
+<Box minH="100vh">
+<Header {…headerProps} />
+<Container maxW="8xl" px={6}>
+{children}
+</Container>
+</Box>
+);
+};
 
-  return (
-    <Box minH="100vh" p={8}>
-      <Text fontSize="2xl" mb={6}>
-        Theme Applied to Entire Page
-      </Text>
-      
-      <Box p={6} bg={colorMode === 'dark' ? 'gray.700' : 'gray.100'} borderRadius="md">
-        <Text mb={4}>Current color mode: {colorMode}</Text>
-        
-        <Button 
-          variant="primary"
-          onClick={toggleColorMode}
-          mb={4}
-        >
-          Toggle Color Mode
-        </Button>
-        
-        <Box p={4} bg="deepRed.500" borderRadius="md">
-          <Text color="white">Deep Red Box (#8A0808)</Text>
-        </Box>
-        
-        <Text mt={4}>
-          This text and background will change based on the selected color mode.
-          The entire page background is controlled by the global styles in the theme.
+// Dashboard Content Component
+const DashboardContent = () => {
+const bgColor = useColorModeValue(‘white’, ‘gray.800’);
+const textColor = useColorModeValue(‘gray.800’, ‘white’);
+
+return (
+<VStack spacing={8} align="stretch" py={8}>
+<Box bg={bgColor} p={8} borderRadius=“xl” boxShadow=“sm” border=“1px” borderColor={useColorModeValue(‘gray.100’, ‘gray.700’)}>
+<Text fontSize="3xl" fontWeight="bold" color={textColor} mb={4}>
+Enterprise Dashboard
+</Text>
+<Text color={useColorModeValue(‘gray.600’, ‘gray.300’)} fontSize=“lg” mb={6}>
+Manage your enterprise operations with our comprehensive dashboard featuring deep red theme and full dark mode support.
+</Text>
+<HStack spacing={4}>
+<Button colorScheme="brand" size="lg">
+View Analytics
+</Button>
+<Button variant="outline" colorScheme="brand" size="lg">
+Manage Projects
+</Button>
+</HStack>
+</Box>
+
+```
+  <Flex gap={6}>
+    {[
+      { title: 'Revenue Analytics', desc: 'Track financial performance and revenue streams' },
+      { title: 'Team Performance', desc: 'Monitor team productivity and collaboration metrics' },
+      { title: 'Project Pipeline', desc: 'Oversee project progress and resource allocation' },
+      { title: 'System Health', desc: 'Monitor infrastructure and system performance' }
+    ].map((card, index) => (
+      <Box 
+        key={index}
+        bg={bgColor} 
+        p={6} 
+        borderRadius="xl" 
+        boxShadow="sm" 
+        flex={1}
+        border="1px"
+        borderColor={useColorModeValue('gray.100', 'gray.700')}
+        _hover={{ 
+          transform: 'translateY(-2px)',
+          boxShadow: 'md',
+          borderColor: 'brand.200'
+        }}
+        transition="all 0.2s"
+      >
+        <Text fontSize="lg" fontWeight="bold" color={textColor} mb={3}>
+          {card.title}
+        </Text>
+        <Text color={useColorModeValue('gray.600', 'gray.300')}>
+          {card.desc}
         </Text>
       </Box>
-    </Box>
-  );
-}
+    ))}
+  </Flex>
+</VStack>
 ```
 
-### Key Fixes:
-1. **Proper Theme Structure**: Using stable v2 API with `extendTheme`
-2. **Global Styles**: Added `styles.global` to apply to entire page
-3. **Color Mode Script**: Added `<ColorModeScript>` for proper initialization
-4. **Full Page Styling**: Set `minH="100vh"` to ensure theme covers entire viewport
-5. **Color Mode Toggle**: Correct implementation using `useColorMode()`
+);
+};
 
-### Additional Recommendations:
+// Main App Component
+const App = () => {
+const [activeNavItem, setActiveNavItem] = React.useState(‘dashboard’);
+const [searchQuery, setSearchQuery] = React.useState(’’);
 
-1. **Create a Layout Component**:
-```tsx
-// src/components/Layout.tsx
-import { Box, BoxProps } from '@chakra-ui/react';
+const navigationItems = [
+{ id: ‘dashboard’, label: ‘Dashboard’ },
+{ id: ‘analytics’, label: ‘Analytics’ },
+{ id: ‘projects’, label: ‘Projects’ },
+{ id: ‘team’, label: ‘Team Management’ },
+{ id: ‘reports’, label: ‘Reports’ },
+{ id: ‘settings’, label: ‘Settings’ },
+{ id: ‘integrations’, label: ‘Integrations’ },
+{ id: ‘support’, label: ‘Support’ },
+{ id: ‘billing’, label: ‘Billing’ }
+];
 
-export default function Layout({ children, ...props }: BoxProps) {
-  return (
-    <Box minH="100vh" p={{ base: 4, md: 8 }} {...props}>
-      {children}
-    </Box>
-  );
-}
-```
+const user = {
+name: ‘John Doe’,
+role: ‘Administrator’,
+avatar: null
+};
 
-2. **Use in App**:
-```tsx
-// src/App.tsx
-import Layout from './components/Layout';
+const userMenuItems = [
+{ label: ‘View Profile’, onClick: () => console.log(‘Profile clicked’) },
+{ label: ‘Account Settings’, onClick: () => console.log(‘Settings clicked’) },
+{ label: ‘Preferences’, onClick: () => console.log(‘Preferences clicked’) },
+{ label: ‘Sign Out’, onClick: () => console.log(‘Sign out clicked’), color: ‘red.500’ }
+];
 
-export default function App() {
-  // ... existing logic
-  
-  return (
-    <Layout>
-      {/* Your content */}
-    </Layout>
-  );
-}
-```
+const headerProps = {
+navigationItems,
+activeNavItem,
+onNavItemClick: (item) => setActiveNavItem(item.id),
+user,
+userMenuItems,
+notificationCount: 7,
+onNotificationClick: () => console.log(‘Notifications clicked’),
+onSearch: setSearchQuery,
+showSearch: true,
+showSettings: true
+};
 
-3. **Add Font Support** (in theme):
-```typescript
-const theme = extendTheme({
-  // ... existing config
-  fonts: {
-    heading: `'Inter', sans-serif`,
-    body: `'Inter', sans-serif`,
-  },
-});
-```
+return (
+<ChakraProvider theme={theme}>
+<Layout headerProps={headerProps}>
+<DashboardContent />
+</Layout>
+</ChakraProvider>
+);
+};
 
-4. **Install Font** (in index.html):
-```html
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-```
-
-This implementation will correctly apply your deep red color and dark/light mode theme to the entire page, following Chakra UI's stable v2 API with proper TypeScript support.
+export default App;
