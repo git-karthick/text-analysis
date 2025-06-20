@@ -38,3 +38,59 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({ user, menuItem
         </Menu>
     );
 };
+
+// components/ui/Header/Header.tsx
+import React from "react";
+import { Box, Flex, Container, HStack, IconButton, Tooltip, useColorModeValue } from "@chakra-ui/react";
+import { SettingsIcon } from "@chakra-ui/icons";
+import { HeaderProps } from "../../../types";
+import { Logo } from "./Logo";
+import { NavigationMenu } from "./NavigationMenu";
+import { SearchBar } from "./SearchBar";
+import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "./ThemeToggle";
+import { UserProfileMenu } from "./UserProfileMenu";
+
+export const Header: React.FC<HeaderProps> = ({ navigationItems, activeNavItem, onNavItemClick, user, userMenuItems, notificationCount = 0, onNotificationClick, onSearch, showSearch = true, showSettings = true }) => {
+    const bgColor = useColorModeValue("white", "gray.800");
+    const borderColor = useColorModeValue("gray.200", "gray.700");
+    const textColor = useColorModeValue("gray.800", "white");
+    const hoverBg = useColorModeValue("gray.100", "gray.700");
+
+    return (
+        <Box bg={bgColor} borderBottom="1px" borderColor={borderColor} position="sticky" top={0} zIndex={1000} boxShadow="sm">
+            <Container maxW="8xl" px={6}>
+                <Flex h={16} alignItems="center" justifyContent="space-between">
+                    {/* Logo */}
+                    <Logo />
+
+                    {/* Navigation */}
+                    <NavigationMenu items={navigationItems} activeItem={activeNavItem} onItemClick={onNavItemClick} />
+
+                    {/* Right side actions */}
+                    <HStack spacing={4}>
+                        {/* Search */}
+                        {showSearch && <SearchBar placeholder="Search enterprise..." onSearch={onSearch} width="280px" />}
+
+                        {/* Notifications */}
+                        <NotificationBell count={notificationCount} onClick={onNotificationClick} />
+
+                        {/* Settings */}
+                        {showSettings && (
+                            <Tooltip label="Settings" placement="bottom">
+                                <IconButton icon={<SettingsIcon />} variant="ghost" size="sm" color={textColor} _hover={{ bg: hoverBg }} aria-label="Settings" />
+                            </Tooltip>
+                        )}
+
+                        {/* Theme Toggle */}
+                        <ThemeToggle />
+
+                        {/* User Profile */}
+                        <UserProfileMenu user={user} menuItems={userMenuItems} />
+                    </HStack>
+                </Flex>
+            </Container>
+        </Box>
+    );
+};
+
