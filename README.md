@@ -94,3 +94,107 @@ export const Header: React.FC<HeaderProps> = ({ navigationItems, activeNavItem, 
     );
 };
 
+// components/ui/Footer/Footer.tsx
+import React from "react";
+import { Box, Container, Flex, Text, VStack, HStack, Link, Divider, SimpleGrid, useColorModeValue } from "@chakra-ui/react";
+import { FooterProps } from "../../../types";
+
+export const Footer: React.FC<FooterProps> = ({ companyName = "Enterprise", year = new Date().getFullYear(), links = [] }) => {
+    const bgColor = useColorModeValue("gray.50", "gray.900");
+    const borderColor = useColorModeValue("gray.200", "gray.700");
+    const textColor = useColorModeValue("gray.600", "gray.300");
+    const headingColor = useColorModeValue("gray.800", "white");
+
+    const defaultLinks = [
+        {
+            title: "Product",
+            items: [
+                { label: "Features", href: "#features" },
+                { label: "Pricing", href: "#pricing" },
+                { label: "Security", href: "#security" },
+                { label: "Integrations", href: "#integrations" },
+            ],
+        },
+        {
+            title: "Company",
+            items: [
+                { label: "About Us", href: "#about" },
+                { label: "Careers", href: "#careers" },
+                { label: "Blog", href: "#blog" },
+                { label: "Press", href: "#press" },
+            ],
+        },
+        {
+            title: "Support",
+            items: [
+                { label: "Help Center", href: "#help" },
+                { label: "Documentation", href: "#docs" },
+                { label: "Contact Us", href: "#contact" },
+                { label: "Status", href: "#status" },
+            ],
+        },
+        {
+            title: "Legal",
+            items: [
+                { label: "Privacy Policy", href: "#privacy" },
+                { label: "Terms of Service", href: "#terms" },
+                { label: "Cookie Policy", href: "#cookies" },
+                { label: "GDPR", href: "#gdpr" },
+            ],
+        },
+    ];
+
+    const footerLinks = links.length > 0 ? links : defaultLinks;
+
+    return (
+        <Box bg={bgColor} borderTop="1px" borderColor={borderColor} mt="auto">
+            <Container maxW="8xl" px={6} py={12}>
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 5 }} spacing={8}>
+                    {/* Company Info */}
+                    <VStack align="flex-start" spacing={4}>
+                        <Text fontSize="lg" fontWeight="bold" color={headingColor}>
+                            {companyName}
+                        </Text>
+                        <Text fontSize="sm" color={textColor} maxW="250px">
+                            Building the future of enterprise software with innovative solutions and cutting-edge technology.
+                        </Text>
+                    </VStack>
+
+                    {/* Footer Links */}
+                    {footerLinks.map((section, index) => (
+                        <VStack key={index} align="flex-start" spacing={3}>
+                            <Text fontSize="sm" fontWeight="semibold" color={headingColor}>
+                                {section.title}
+                            </Text>
+                            {section.items.map((item, itemIndex) => (
+                                <Link key={itemIndex} href={item.href} fontSize="sm" color={textColor} _hover={{ color: "brand.500", textDecoration: "underline" }}>
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </VStack>
+                    ))}
+                </SimpleGrid>
+
+                <Divider my={8} borderColor={borderColor} />
+
+                <Flex direction={{ base: "column", md: "row" }} justify="space-between" align="center" gap={4}>
+                    <Text fontSize="sm" color={textColor}>
+                        © {year} {companyName}. All rights reserved.
+                    </Text>
+                    <HStack spacing={6}>
+                        <Link href="#privacy" fontSize="sm" color={textColor} _hover={{ color: "brand.500" }}>
+                            Privacy
+                        </Link>
+                        <Link href="#terms" fontSize="sm" color={textColor} _hover={{ color: "brand.500" }}>
+                            Terms
+                        </Link>
+                        <Link href="#cookies" fontSize="sm" color={textColor} _hover={{ color: "brand.500" }}>
+                            Cookies
+                        </Link>
+                    </HStack>
+                </Flex>
+            </Container>
+        </Box>
+    );
+};
+
