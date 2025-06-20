@@ -1,42 +1,51 @@
-// components/ui/Header/NavigationMenu.tsx
-import React from "react";
-import { Button, HStack, useColorModeValue } from "@chakra-ui/react";
-import { NavigationItem } from "../../../types";
+// components/ui/Header/SearchBar.tsx
+import React, { useState, useCallback } from "react";
+import { Input, InputGroup, InputLeftElement, useColorModeValue } from "@chakra-ui/react";
+import { SearchIcon } from "@chakra-ui/icons";
 
-interface NavigationMenuProps {
-    items: NavigationItem[];
-    activeItem?: string;
-    onItemClick?: (item: NavigationItem) => void;
+interface SearchBarProps {
+    placeholder?: string;
+    onSearch?: (query: string) => void;
+    width?: string;
+    debounceMs?: number;
 }
 
-export const NavigationMenu: React.FC<NavigationMenuProps> = ({ items, activeItem, onItemClick }) => {
-    const textColor = useColorModeValue("gray.800", "white");
-    const hoverBg = useColorModeValue("gray.100", "gray.700");
-    const activeBg = useColorModeValue("brand.50", "brand.900");
+export const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSearch, width = "300px", debounceMs = 300 }) => {
+    const [query, setQuery] = useState("");
+    const bgColor = useColorModeValue("white", "gray.700");
+    const borderColor = useColorModeValue("gray.200", "gray.600");
+
+    const debouncedSearch = useCallback(
+        debounce((searchQuery: string) => {
+            onSearch?.(searchQuery);
+        }, debounceMs),
+        [onSearch, debounceMs]
+    );
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setQuery(value);
+        debouncedSearch(value);
+    };
 
     return (
-        <HStack spacing={1}>
-            {" "}
-            {items.map((item) => (
-                <Button
-                    key={item.id}
-                    variant="ghost"
-                    size="sm"
-                    color={activeItem === item.id ? "brand.500" : textColor}
-                    bg={activeItem === item.id ? activeBg : "transparent"}
-                    _hover={{
-                        bg: hoverBg,
-                        color: "brand.500",
-                    }}
-                    _active={{
-                        bg: "brand.50",
-                    }}
-                    fontWeight={activeItem === item.id ? "semibold" : "medium"}
-                    onClick={() => onItemClick?.(item)}
-                >
-                    {item.label}{" "}
-                </Button>
-            ))}{" "}
-        </HStack>
+        <InputGroup size="sm" width={width}>
+            <InputLeftElement pointerEvents="none">
+                <SearchIcon color="gray.400" />
+            </InputLeftElement>
+            <Input
+                placeholder={placeholder}
+                value={query}
+                onChange={handleChange}
+                bg={bgColor}
+                border="1px solid"
+                borderColor={borderColor}
+                _hover={{ borderColor: "brand.300" }}
+                _focus={{
+                    borderColor: "brand.500",
+                    boxShadow: "0 0 0 1px #dc2626",
+                }}
+            />
+        </InputGroup>
     );
 };
