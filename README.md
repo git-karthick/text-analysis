@@ -1218,42 +1218,32 @@ export default App;
 
 
 
+
+  
 // components/ui/Header/Logo.tsx
-import React from 'react';
-import { Box, Flex, Text, useColorModeValue } from '@chakra-ui/react';
+import React from "react";
+import { Box, Flex, Text, useColorModeValue } from "@chakra-ui/react";
 
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg';
-  companyName?: string;
+    size?: "sm" | "md" | "lg";
+    companyName?: string;
 }
 
-export const Logo: React.FC<LogoProps> = ({ 
-  size = 'md', 
-  companyName = 'Enterprise' 
-}) => {
-  const textColor = useColorModeValue('gray.800', 'white');
-  const logoSize = size === 'lg' ? 12 : size === 'sm' ? 8 : 10;
-  const fontSize = size === 'lg' ? 'xl' : size === 'sm' ? 'md' : 'lg';
-  
-  return (
-    <Flex alignItems="center">
-      <Box
-        w={logoSize}
-        h={logoSize}
-        bg="brand.500"
-        borderRadius="lg"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        mr={3}
-      >
-        <Text color="white" fontWeight="bold" fontSize={fontSize}>
-          {companyName.charAt(0).toUpperCase()}
-        </Text>
-      </Box>
-      <Text fontSize="xl" fontWeight="bold" color={textColor}>
-        {companyName}
-      </Text>
-    </Flex>
-  );
+export const Logo: React.FC<LogoProps> = ({ size = "md", companyName = "Enterprise" }) => {
+    const textColor = useColorModeValue("gray.800", "white");
+    const logoSize = size === "lg" ? 12 : size === "sm" ? 8 : 10;
+    const fontSize = size === "lg" ? "xl" : size === "sm" ? "md" : "lg";
+
+    return (
+        <Flex alignItems="center">
+            <Box w={logoSize} h={logoSize} bg="brand.500" borderRadius="lg" display="flex" alignItems="center" justifyContent="center" mr={3}>
+                <Text color="white" fontWeight="bold" fontSize={fontSize}>
+                    {companyName.charAt(0).toUpperCase()}
+                </Text>
+            </Box>
+            <Text fontSize="xl" fontWeight="bold" color={textColor}>
+                {companyName}
+            </Text>
+        </Flex>
+    );
 };
