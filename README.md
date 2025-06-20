@@ -199,24 +199,18 @@ export const Footer: React.FC<FooterProps> = ({ companyName = "Enterprise", year
 };
 
 // components/common/Layout/Layout.tsx
-import React from 'react';
-import { Box, Flex } from '@chakra-ui/react';
-import { LayoutProps } from '../../../types';
-import { Header } from '../../ui/Header/Header';
-import { Footer } from '../../ui/Footer/Footer';
+import React from "react";
+import { Box, Flex } from "@chakra-ui/react";
+import { LayoutProps } from "../../../types";
+import { Header } from "../../ui/Header/Header";
+import { Footer } from "../../ui/Footer/Footer";
 
-export const Layout: React.FC<LayoutProps> = ({
-  children,
-  headerProps,
-  footerProps
-}) => {
-  return (
-    <Flex direction="column" minH="100vh">
-      <Header {...headerProps} />
-      <Box flex="1">
-        {children}
-      </Box>
-      <Footer {...footerProps} />
-    </Flex>
-  );
+export const Layout: React.FC<LayoutProps> = ({ children, headerProps, footerProps }) => {
+    return (
+        <Flex direction="column" minH="100vh">
+            <Header {...headerProps} />
+            <Box flex="1">{children}</Box>
+            <Footer {...footerProps} />
+        </Flex>
+    );
 };
