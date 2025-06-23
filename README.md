@@ -208,3 +208,6 @@ The layout now matches your requirement:
    - Right: Empty space for balance
 
 You can customize the SVG logo component with your actual logo design while maintaining this header structure.
+
+
+Anand is facing an issue logging into his laptop. He is currently working with the office tech support team, so please expect some delay in his response.
