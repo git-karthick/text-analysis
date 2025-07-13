@@ -1,0 +1,255 @@
+<svg viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1400" height="900" fill="#f5f5f5" stroke="#333333" stroke-width="2"/>
+  
+  <!-- Define patterns and markers -->
+  <defs>
+    <!-- Arrow marker -->
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#1e88e5"/>
+    </marker>
+    
+    <!-- Dashed arrow for cross-pipeline -->
+    <marker id="dashedArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#ff9800"/>
+    </marker>
+    
+    <!-- Hatching pattern for groups -->
+    <pattern id="userPattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#e3f2fd"/>
+      <path d="M 0,4 l 4,-4 M -1,1 l 2,-2 M 3,5 l 2,-2" stroke="#1e88e5" stroke-width="0.5"/>
+    </pattern>
+    
+    <pattern id="offlinePattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#fff3e0"/>
+      <path d="M 0,4 l 4,-4 M -1,1 l 2,-2 M 3,5 l 2,-2" stroke="#ff9800" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  
+  <!-- Title -->
+  <text x="700" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333333" text-anchor="middle">
+    FIGURE 1: VOICE-CONTROLLED DOCUMENT PROCESSING SYSTEM ARCHITECTURE
+  </text>
+  
+  <!-- User Interaction Subsystem -->
+  <g id="user_interaction_subsystem">
+    <!-- Group boundary -->
+    <rect x="50" y="80" width="600" height="350" rx="10" fill="url(#userPattern)" stroke="#1e88e5" stroke-width="2"/>
+    <text x="70" y="100" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#333333">
+      USER INTERACTION SUBSYSTEM (100)
+    </text>
+    
+    <!-- User Voice Input (110) -->
+    <rect x="80" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Microphone icon (colorful) -->
+    <path d="M 110 150 A 5 5 0 0 1 110 160 M 108 160 H 112 V 168 H 108" fill="none" stroke="#0288d1" stroke-width="2"/>
+    <path d="M 105 165 A 8 8 0 0 0 115 165" stroke="#0288d1" stroke-width="2"/>
+    <text x="130" y="153" font-family="Arial, sans-serif" font-size="10" fill="#333333">USER VOICE</text>
+    <text x="130" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">INPUT MODULE</text>
+    <text x="130" y="179" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(110)</text>
+    
+    <!-- Voice-to-Text Service (120) -->
+    <rect x="260" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Speech bubble icon (colorful) -->
+    <path d="M 290 150 A 10 6 0 0 1 290 162 L 286 165 L 290 162" fill="#bbdefb" stroke="#0288d1" stroke-width="1.5"/>
+    <text x="310" y="153" font-family="Arial, sans-serif" font-size="10" fill="#333333">VOICE-TO-TEXT</text>
+    <text x="310" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">CONVERSION</text>
+    <text x="310" y="179" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(120)</text>
+    
+    <!-- LLM Engine (130) -->
+    <rect x="440" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Brain icon (colorful) -->
+    <path d="M 470 150 Q 475 145 480 150 M 470 160 Q 475 165 480 160" fill="none" stroke="#0288d1" stroke-width="1.5"/>
+    <circle cx="475" cy="155" r="8" fill="#bbdefb" stroke="#0288d1" stroke-width="1.5"/>
+    <text x="490" y="153" font-family="Arial, sans-serif" font-size="10" fill="#333333">LARGE LANGUAGE</text>
+    <text x="490" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">MODEL ENGINE</text>
+    <text x="490" y="179" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(130)</text>
+    
+    <!-- Command Parser (140) -->
+    <rect x="140" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Code brackets icon (colorful) -->
+    <path d="M 165 275 L 161 279 L 165 283 M 175 275 L 179 279 L 175 283" fill="none" stroke="#0288d1" stroke-width="1.5"/>
+    <text x="190" y="270" font-family="Arial, sans-serif" font-size="10" fill="#333333">COMMAND</text>
+    <text x="190" y="283" font-family="Arial, sans-serif" font-size="10" fill="#333333">PARSER MODULE</text>
+    <text x="190" y="296" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(140)</text>
+    
+    <!-- Execution Engine (150) -->
+    <rect x="320" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Gear icon (colorful) -->
+    <circle cx="350" cy="275" r="6" fill="#bbdefb" stroke="#0288d1" stroke-width="1.5"/>
+    <path d="M 350 269 L 354 271 L 350 273 L 346 271 Z" fill="#0288d1"/>
+    <text x="370" y="270" font-family="Arial, sans-serif" font-size="10" fill="#333333">EXECUTION</text>
+    <text x="370" y="283" font-family="Arial, sans-serif" font-size="10" fill="#333333">ENGINE</text>
+    <text x="370" y="296" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(150)</text>
+    
+    <!-- PowerPoint Service (160) -->
+    <rect x="500" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+    <!-- Document icon (colorful) -->
+    <rect x="525" y="270" width="10" height="12" fill="#bbdefb" stroke="#0288d1" stroke-width="1.5"/>
+    <line x1="527" y1="274" x2="533" y2="274" stroke="#0288d1" stroke-width="1"/>
+    <line x1="527" y1="278" x2="533" y2="278" stroke="#0288d1" stroke-width="1"/>
+    <text x="540" y="270" font-family="Arial, sans-serif" font-size="10" fill="#333333">PRESENTATION</text>
+    <text x="540" y="283" font-family="Arial, sans-serif" font-size="10" fill="#333333">SERVICE</text>
+    <text x="540" y="296" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(160)</text>
+  </g>
+  
+  <!-- Offline Processing Subsystem -->
+  <g id="offline_processing_subsystem">
+    <!-- Group boundary -->
+    <rect x="750" y="80" width="600" height="650" rx="10" fill="url(#offlinePattern)" stroke="#ff9800" stroke-width="2"/>
+    <text x="770" y="100" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#333333">
+      OFFLINE PROCESSING SUBSYSTEM (200)
+    </text>
+    
+    <!-- Directory Scanner (210) -->
+    <rect x="780" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Folder icon (colorful) -->
+    <path d="M 805 155 L 818 155 L 818 170 L 805 170 Z M 805 155 L 810 150 L 818 150 L 818 155" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <text x="830" y="153" font-family="Arial, sans-serif" font-size="10" fill="#333333">DIRECTORY</text>
+    <text x="830" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">SCANNER</text>
+    <text x="830" y="179" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(210)</text>
+    
+    <!-- ID Assigner/Path Mapper (220) -->
+    <rect x="980" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Key icon (colorful) -->
+    <circle cx="1010" cy="155" r="5" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <rect x="1014" y="152" width="6" height="5" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <text x="1030" y="151" font-family="Arial, sans-serif" font-size="9" fill="#333333">ID ASSIGNER/</text>
+    <text x="1030" y="163" font-family="Arial, sans-serif" font-size="9" fill="#333333">PATH MAPPER</text>
+    <text x="1030" y="176" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(220)</text>
+    
+    <!-- Content Extractor (230) -->
+    <rect x="1180" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Extract icon (colorful) -->
+    <rect x="1205" y="150" width="10" height="12" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <path d="M 1210 156 L 1218 156" stroke="#f57c00" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text x="1225" y="153" font-family="Arial, sans-serif" font-size="10" fill="#333333">CONTENT</text>
+    <text x="1225" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">EXTRACTOR</text>
+    <text x="1225" y="179" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(230)</text>
+    
+    <!-- Vision AI OCR (240) -->
+    <rect x="980" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Eye icon (colorful) -->
+    <ellipse cx="1010" cy="275" rx="8" ry="5" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <circle cx="1010" cy="275" r="2.5" fill="#f57c00"/>
+    <text x="1030" y="270" font-family="Arial, sans-serif" font-size="10" fill="#333333">VISION AI</text>
+    <text x="1030" y="283" font-family="Arial, sans-serif" font-size="10" fill="#333333">OCR MODULE</text>
+    <text x="1030" y="296" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(240)</text>
+    
+    <!-- RAKE Keyword Extractor (250) -->
+    <rect x="1180" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Keywords icon (colorful) -->
+    <rect x="1205" y="270" width="5" height="1.5" fill="#f57c00"/>
+    <rect x="1205" y="274" width="8" height="1.5" fill="#f57c00"/>
+    <rect x="1205" y="278" width="6" height="1.5" fill="#f57c00"/>
+    <text x="1220" y="270" font-family="Arial, sans-serif" font-size="9" fill="#333333">RAKE KEYWORD</text>
+    <text x="1220" y="283" font-family="Arial, sans-serif" font-size="9" fill="#333333">EXTRACTOR</text>
+    <text x="1220" y="296" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(250)</text>
+    
+    <!-- Metadata Trainer (260) -->
+    <rect x="1080" y="400" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Training icon (colorful) -->
+    <circle cx="1110" cy="425" r="6" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <path d="M 1106 421 L 1114 429 M 1106 429 L 1114 421" stroke="#f57c00" stroke-width="1.5"/>
+    <text x="1130" y="420" font-family="Arial, sans-serif" font-size="10" fill="#333333">METADATA</text>
+    <text x="1130" y="433" font-family="Arial, sans-serif" font-size="10" fill="#333333">TRAINER</text>
+    <text x="1130" y="446" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(260)</text>
+    
+    <!-- Metadata Store (270) -->
+    <rect x="1080" y="550" width="140" height="80" rx="5" fill="#ffffff" stroke="#ff9800" stroke-width="1.5"/>
+    <!-- Database icon (colorful) -->
+    <ellipse cx="1110" cy="565" rx="10" ry="3" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <ellipse cx="1110" cy="573" rx="10" ry="3" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <ellipse cx="1110" cy="581" rx="10" ry="3" fill="#ffe0b2" stroke="#f57c00" stroke-width="1.5"/>
+    <text x="1130" y="568" font-family="Arial, sans-serif" font-size="10" fill="#333333">METADATA</text>
+    <text x="1130" y="581" font-family="Arial, sans-serif" font-size="10" fill="#333333">STORE</text>
+    <text x="1130" y="594" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333333">(270)</text>
+  </g>
+  
+  <!-- Data Flow Arrows - User Interaction Pipeline -->
+  <!-- 110 → 120 -->
+  <line x1="220" y1="170" x2="260" y2="170" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="230" y="163" font-family="Arial, sans-serif" font-size="8" fill="#333333">A</text>
+  
+  <!-- 120 → 130 -->
+  <line x1="400" y1="170" x2="440" y2="170" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="410" y="163" font-family="Arial, sans-serif" font-size="8" fill="#333333">B</text>
+  
+  <!-- 130 → 140 -->
+  <path d="M 510 210 L 510 235 L 190 235 L 190 245" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="350" y="228" font-family="Arial, sans-serif" font-size="8" fill="#333333">C</text>
+  
+  <!-- 140 → 150 -->
+  <line x1="280" y1="290" x2="320" y2="290" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="290" y="283" font-family="Arial, sans-serif" font-size="8" fill="#333333">D</text>
+  
+  <!-- 150 → 160 -->
+  <line x1="460" y1="290" x2="500" y2="290" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="470" y="283" font-family="Arial, sans-serif" font-size="8" fill="#333333">E</text>
+  
+  <!-- 160 → 110 (Return path) -->
+  <path d="M 570 250 L 570 200 L 650 200 L 650 420 L 40 420 L 40 170 L 80 170" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="400" y="193" font-family="Arial, sans-serif" font-size="8" fill="#333333">F</text>
+  
+  <!-- Data Flow Arrows - Offline Processing Pipeline -->
+  <!-- 210 → 220 -->
+  <line x1="920" y1="170" x2="980" y2="170" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="940" y="163" font-family="Arial, sans-serif" font-size="8" fill="#333333">G</text>
+  
+  <!-- 220 → 230 -->
+  <line x1="1120" y1="170" x2="1180" y2="170" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1140" y="163" font-family="Arial, sans-serif" font-size="8" fill="#333333">H</text>
+  
+  <!-- 230 → 240 -->
+  <path d="M 1250 210 L 1250 235 L 1030 235 L 1030 245" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="1140" y="228" font-family="Arial, sans-serif" font-size="8" fill="#333333">I</text>
+  
+  <!-- 230 → 250 -->
+  <line x1="1250" y1="210" x2="1250" y2="250" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1255" y="228" font-family="Arial, sans-serif" font-size="8" fill="#333333">J</text>
+  
+  <!-- 240 → 250 -->
+  <line x1="1120" y1="290" x2="1180" y2="290" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1140" y="283" font-family="Arial, sans-serif" font-size="8" fill="#333333">K</text>
+  
+  <!-- 250 → 260 -->
+  <path d="M 1250 330 L 1250 360 L 1150 360 L 1150 400" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="1200" y="353" font-family="Arial, sans-serif" font-size="8" fill="#333333">L</text>
+  
+  <!-- 260 → 270 -->
+  <line x1="1150" y1="480" x2="1150" y2="550" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1155" y="510" font-family="Arial, sans-serif" font-size="8" fill="#333333">M</text>
+  
+  <!-- Cross-pipeline connection: 270 → 140 -->
+  <path d="M 1080 590 L 650 590 L 650 730 L 40 730 L 40 290 L 140 290" stroke="#ff9800" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#dashedArrow)" fill="none"/>
+  <text x="600" y="583" font-family="Arial, sans-serif" font-size="8" fill="#ff9800">N</text>
+  
+  <!-- Reference numerals legend -->
+  <rect x="50" y="750" width="600" height="140" fill="#ffffff" stroke="#333333" stroke-width="1"/>
+  <text x="60" y="770" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#333333">REFERENCE NUMERALS:</text>
+  <text x="60" y="790" font-family="Arial, sans-serif" font-size="9" fill="#333333">100 - USER INTERACTION SUBSYSTEM</text>
+  <text x="60" y="805" font-family="Arial, sans-serif" font-size="9" fill="#333333">110 - USER VOICE INPUT MODULE</text>
+  <text x="60" y="820" font-family="Arial, sans-serif" font-size="9" fill="#333333">120 - VOICE-TO-TEXT CONVERSION</text>
+  <text x="60" y="835" font-family="Arial, sans-serif" font-size="9" fill="#333333">130 - LARGE LANGUAGE MODEL ENGINE</text>
+  <text x="60" y="850" font-family="Arial, sans-serif" font-size="9" fill="#333333">140 - COMMAND PARSER MODULE</text>
+  <text x="60" y="865" font-family="Arial, sans-serif" font-size="9" fill="#333333">150 - EXECUTION ENGINE</text>
+  <text x="60" y="880" font-family="Arial, sans-serif" font-size="9" fill="#333333">160 - PRESENTATION SERVICE</text>
+  
+  <text x="350" y="790" font-family="Arial, sans-serif" font-size="9" fill="#333333">200 - OFFLINE PROCESSING SUBSYSTEM</text>
+  <text x="350" y="805" font-family="Arial, sans-serif" font-size="9" fill="#333333">210 - DIRECTORY SCANNER</text>
+  <text x="350" y="820" font-family="Arial, sans-serif" font-size="9" fill="#333333">220 - ID ASSIGNER/PATH MAPPER</text>
+  <text x="350" y="835" font-family="Arial, sans-serif" font-size="9" fill="#333333">230 - CONTENT EXTRACTOR</text>
+  <text x="350" y="850" font-family="Arial, sans-serif" font-size="9" fill="#333333">240 - VISION AI OCR MODULE</text>
+  <text x="350" y="865" font-family="Arial, sans-serif" font-size="9" fill="#333333">250 - RAKE KEYWORD EXTRACTOR</text>
+  <text x="350" y="880" font-family="Arial, sans-serif" font-size="9" fill="#333333">260 - METADATA TRAINER</text>
+  <text x="350" y="895" font-family="Arial, sans-serif" font-size="9" fill="#333333">270 - METADATA STORE</text>
+  
+  <!-- Data flow legend -->
+  <rect x="700" y="750" width="300" height="100" fill="#ffffff" stroke="#333333" stroke-width="1"/>
+  <text x="710" y="770" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#333333">DATA FLOW LEGEND:</text>
+  <line x1="710" y1="785" x2="740" y2="785" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="750" y="790" font-family="Arial, sans-serif" font-size="9" fill="#333333">Primary Data Flow</text>
+  <line x1="710" y1="805" x2="740" y2="805" stroke="#ff9800" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#dashedArrow)"/>
+  <text x="750" y="810" font-family="Arial, sans-serif" font-size="9" fill="#333333">Cross-Subsystem Connection</text>
+  <text x="710" y="830" font-family="Arial, sans-serif" font-size="9" fill="#333333">A-N: Reference Flow Identifiers</text>
+</svg>

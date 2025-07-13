@@ -1,0 +1,260 @@
+<svg viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1400" height="900" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+  
+  <!-- Define patterns and markers -->
+  <defs>
+    <!-- Arrow marker -->
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#000000"/>
+    </marker>
+    
+    <!-- Dashed arrow for cross-pipeline -->
+    <marker id="dashedArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#666666"/>
+    </marker>
+    
+    <!-- Hatching pattern for groups -->
+    <pattern id="userPattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#f0f8ff"/>
+      <path d="M 0,4 l 4,-4 M -1,1 l 2,-2 M 3,5 l 2,-2" stroke="#4169e1" stroke-width="0.5"/>
+    </pattern>
+    
+    <pattern id="offlinePattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#fff8dc"/>
+      <path d="M 0,4 l 4,-4 M -1,1 l 2,-2 M 3,5 l 2,-2" stroke="#ff8c00" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  
+  <!-- Title -->
+  <text x="700" y="30" font-family="Times, serif" font-size="16" font-weight="bold" fill="#000000" text-anchor="middle">
+    FIGURE 1: VOICE-CONTROLLED DOCUMENT PROCESSING SYSTEM ARCHITECTURE
+  </text>
+  
+  <!-- User Interaction Subsystem -->
+  <g id="user_interaction_subsystem">
+    <!-- Group boundary -->
+    <rect x="50" y="80" width="600" height="350" rx="10" fill="url(#userPattern)" stroke="#000000" stroke-width="2"/>
+    <text x="70" y="100" font-family="Times, serif" font-size="13" font-weight="bold" fill="#000000">
+      USER INTERACTION SUBSYSTEM (100)
+    </text>
+    
+    <!-- User Voice Input (110) -->
+    <rect x="80" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Microphone icon -->
+    <circle cx="110" cy="155" r="6" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <rect x="107" y="161" width="6" height="12" fill="#000000"/>
+    <text x="130" y="153" font-family="Times, serif" font-size="10" fill="#000000">USER VOICE</text>
+    <text x="130" y="166" font-family="Times, serif" font-size="10" fill="#000000">INPUT MODULE</text>
+    <text x="130" y="179" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(110)</text>
+    
+    <!-- Voice-to-Text Service (120) -->
+    <rect x="260" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Speech bubble icon -->
+    <ellipse cx="290" cy="155" rx="10" ry="6" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 286 161 L 283 165 L 290 161" fill="#000000"/>
+    <text x="310" y="153" font-family="Times, serif" font-size="10" fill="#000000">VOICE-TO-TEXT</text>
+    <text x="310" y="166" font-family="Times, serif" font-size="10" fill="#000000">CONVERSION</text>
+    <text x="310" y="179" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(120)</text>
+    
+    <!-- LLM Engine (130) -->
+    <rect x="440" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Brain/AI icon -->
+    <circle cx="470" cy="155" r="8" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 466 151 Q 470 147 474 151" fill="none" stroke="#000000" stroke-width="1"/>
+    <path d="M 466 159 Q 470 163 474 159" fill="none" stroke="#000000" stroke-width="1"/>
+    <text x="490" y="153" font-family="Times, serif" font-size="10" fill="#000000">LARGE LANGUAGE</text>
+    <text x="490" y="166" font-family="Times, serif" font-size="10" fill="#000000">MODEL ENGINE</text>
+    <text x="490" y="179" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(130)</text>
+    
+    <!-- Command Parser (140) -->
+    <rect x="140" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Code brackets icon -->
+    <path d="M 165 275 L 161 279 L 165 283" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 175 275 L 179 279 L 175 283" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <text x="190" y="270" font-family="Times, serif" font-size="10" fill="#000000">COMMAND</text>
+    <text x="190" y="283" font-family="Times, serif" font-size="10" fill="#000000">PARSER MODULE</text>
+    <text x="190" y="296" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(140)</text>
+    
+    <!-- Execution Engine (150) -->
+    <rect x="320" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Gear icon -->
+    <circle cx="350" cy="275" r="6" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <polygon points="350,269 354,271 350,273 346,271" fill="#000000"/>
+    <text x="370" y="270" font-family="Times, serif" font-size="10" fill="#000000">EXECUTION</text>
+    <text x="370" y="283" font-family="Times, serif" font-size="10" fill="#000000">ENGINE</text>
+    <text x="370" y="296" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(150)</text>
+    
+    <!-- PowerPoint Service (160) -->
+    <rect x="500" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Document icon -->
+    <rect x="525" y="270" width="10" height="12" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <line x1="527" y1="274" x2="533" y2="274" stroke="#000000" stroke-width="1"/>
+    <line x1="527" y1="278" x2="533" y2="278" stroke="#000000" stroke-width="1"/>
+    <text x="540" y="270" font-family="Times, serif" font-size="10" fill="#000000">PRESENTATION</text>
+    <text x="540" y="283" font-family="Times, serif" font-size="10" fill="#000000">SERVICE</text>
+    <text x="540" y="296" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(160)</text>
+  </g>
+  
+  <!-- Offline Processing Subsystem -->
+  <g id="offline_processing_subsystem">
+    <!-- Group boundary -->
+    <rect x="750" y="80" width="600" height="650" rx="10" fill="url(#offlinePattern)" stroke="#000000" stroke-width="2"/>
+    <text x="770" y="100" font-family="Times, serif" font-size="13" font-weight="bold" fill="#000000">
+      OFFLINE PROCESSING SUBSYSTEM (200)
+    </text>
+    
+    <!-- Directory Scanner (210) -->
+    <rect x="780" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Folder icon -->
+    <path d="M 805 155 L 818 155 L 818 170 L 805 170 Z" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 805 155 L 810 150 L 818 150 L 818 155" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <text x="830" y="153" font-family="Times, serif" font-size="10" fill="#000000">DIRECTORY</text>
+    <text x="830" y="166" font-family="Times, serif" font-size="10" fill="#000000">SCANNER</text>
+    <text x="830" y="179" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(210)</text>
+    
+    <!-- ID Assigner/Path Mapper (220) -->
+    <rect x="980" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Key icon -->
+    <circle cx="1010" cy="155" r="5" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <rect x="1014" y="152" width="6" height="5" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <text x="1030" y="151" font-family="Times, serif" font-size="9" fill="#000000">ID ASSIGNER/</text>
+    <text x="1030" y="163" font-family="Times, serif" font-size="9" fill="#000000">PATH MAPPER</text>
+    <text x="1030" y="176" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(220)</text>
+    
+    <!-- Content Extractor (230) -->
+    <rect x="1180" y="130" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Extract icon -->
+    <rect x="1205" y="150" width="10" height="12" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 1210 156 L 1218 156" stroke="#000000" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text x="1225" y="153" font-family="Times, serif" font-size="10" fill="#000000">CONTENT</text>
+    <text x="1225" y="166" font-family="Times, serif" font-size="10" fill="#000000">EXTRACTOR</text>
+    <text x="1225" y="179" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(230)</text>
+    
+    <!-- Vision AI OCR (240) -->
+    <rect x="980" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Eye icon -->
+    <ellipse cx="1010" cy="275" rx="8" ry="5" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <circle cx="1010" cy="275" r="2.5" fill="#000000"/>
+    <text x="1030" y="270" font-family="Times, serif" font-size="10" fill="#000000">VISION AI</text>
+    <text x="1030" y="283" font-family="Times, serif" font-size="10" fill="#000000">OCR MODULE</text>
+    <text x="1030" y="296" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(240)</text>
+    
+    <!-- RAKE Keyword Extractor (250) -->
+    <rect x="1180" y="250" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Keywords icon -->
+    <rect x="1205" y="270" width="5" height="1.5" fill="#000000"/>
+    <rect x="1205" y="274" width="8" height="1.5" fill="#000000"/>
+    <rect x="1205" y="278" width="6" height="1.5" fill="#000000"/>
+    <text x="1220" y="270" font-family="Times, serif" font-size="9" fill="#000000">RAKE KEYWORD</text>
+    <text x="1220" y="283" font-family="Times, serif" font-size="9" fill="#000000">EXTRACTOR</text>
+    <text x="1220" y="296" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(250)</text>
+    
+    <!-- Metadata Trainer (260) -->
+    <rect x="1080" y="400" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Training icon -->
+    <circle cx="1110" cy="425" r="6" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 1106 421 L 1114 429" stroke="#000000" stroke-width="1.5"/>
+    <path d="M 1106 429 L 1114 421" stroke="#000000" stroke-width="1.5"/>
+    <text x="1130" y="420" font-family="Times, serif" font-size="10" fill="#000000">METADATA</text>
+    <text x="1130" y="433" font-family="Times, serif" font-size="10" fill="#000000">TRAINER</text>
+    <text x="1130" y="446" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(260)</text>
+    
+    <!-- Metadata Store (270) -->
+    <rect x="1080" y="550" width="140" height="80" rx="5" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+    <!-- Database icon -->
+    <ellipse cx="1110" cy="565" rx="10" ry="3" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <ellipse cx="1110" cy="573" rx="10" ry="3" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <ellipse cx="1110" cy="581" rx="10" ry="3" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <text x="1130" y="568" font-family="Times, serif" font-size="10" fill="#000000">METADATA</text>
+    <text x="1130" y="581" font-family="Times, serif" font-size="10" fill="#000000">STORE</text>
+    <text x="1130" y="594" font-family="Times, serif" font-size="10" font-weight="bold" fill="#000000">(270)</text>
+  </g>
+  
+  <!-- Data Flow Arrows - User Interaction Pipeline -->
+  <!-- 110 → 120 -->
+  <line x1="220" y1="170" x2="260" y2="170" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="230" y="163" font-family="Times, serif" font-size="8" fill="#000000">A</text>
+  
+  <!-- 120 → 130 -->
+  <line x1="400" y1="170" x2="440" y2="170" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="410" y="163" font-family="Times, serif" font-size="8" fill="#000000">B</text>
+  
+  <!-- 130 → 140 -->
+  <path d="M 510 210 L 510 230 L 190 230 L 190 250" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="350" y="223" font-family="Times, serif" font-size="8" fill="#000000">C</text>
+  
+  <!-- 140 → 150 -->
+  <line x1="280" y1="290" x2="320" y2="290" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="290" y="283" font-family="Times, serif" font-size="8" fill="#000000">D</text>
+  
+  <!-- 150 → 160 -->
+  <line x1="460" y1="290" x2="500" y2="290" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="470" y="283" font-family="Times, serif" font-size="8" fill="#000000">E</text>
+  
+  <!-- 160 → 110 (Return path) -->
+  <path d="M 570 250 L 570 220 L 650 220 L 650 400 L 50 400 L 50 170 L 80 170" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="400" y="213" font-family="Times, serif" font-size="8" fill="#000000">F</text>
+  
+  <!-- Data Flow Arrows - Offline Processing Pipeline -->
+  <!-- 210 → 220 -->
+  <line x1="920" y1="170" x2="980" y2="170" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="940" y="163" font-family="Times, serif" font-size="8" fill="#000000">G</text>
+  
+  <!-- 220 → 230 -->
+  <line x1="1120" y1="170" x2="1180" y2="170" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1140" y="163" font-family="Times, serif" font-size="8" fill="#000000">H</text>
+  
+  <!-- 230 → 240 -->
+  <path d="M 1250 210 L 1250 230 L 1030 230 L 1030 250" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="1140" y="223" font-family="Times, serif" font-size="8" fill="#000000">I</text>
+  
+  <!-- 230 → 250 -->
+  <line x1="1250" y1="210" x2="1250" y2="250" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1255" y="223" font-family="Times, serif" font-size="8" fill="#000000">J</text>
+  
+  <!-- 240 → 250 -->
+  <line x1="1120" y1="290" x2="1180" y2="290" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1140" y="283" font-family="Times, serif" font-size="8" fill="#000000">K</text>
+  
+  <!-- 250 → 260 -->
+  <path d="M 1250 330 L 1250 360 L 1150 360 L 1150 400" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="1200" y="353" font-family="Times, serif" font-size="8" fill="#000000">L</text>
+  
+  <!-- 260 → 270 -->
+  <line x1="1150" y1="480" x2="1150" y2="550" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="1155" y="510" font-family="Times, serif" font-size="8" fill="#000000">M</text>
+  
+  <!-- Cross-pipeline connection: 270 → 140 -->
+  <path d="M 1080 590 L 650 590 L 650 740 L 50 740 L 50 290 L 140 290" stroke="#666666" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#dashedArrow)" fill="none"/>
+  <text x="600" y="583" font-family="Times, serif" font-size="8" fill="#666666">N</text>
+  
+  <!-- Reference numerals legend -->
+  <rect x="50" y="750" width="600" height="140" fill="#ffffff" stroke="#000000" stroke-width="1"/>
+  <text x="60" y="770" font-family="Times, serif" font-size="11" font-weight="bold" fill="#000000">REFERENCE NUMERALS:</text>
+  <text x="60" y="790" font-family="Times, serif" font-size="9" fill="#000000">100 - USER INTERACTION SUBSYSTEM</text>
+  <text x="60" y="805" font-family="Times, serif" font-size="9" fill="#000000">110 - USER VOICE INPUT MODULE</text>
+  <text x="60" y="820" font-family="Times, serif" font-size="9" fill="#000000">120 - VOICE-TO-TEXT CONVERSION</text>
+  <text x="60" y="835" font-family="Times, serif" font-size="9" fill="#000000">130 - LARGE LANGUAGE MODEL ENGINE</text>
+  <text x="60" y="850" font-family="Times, serif" font-size="9" fill="#000000">140 - COMMAND PARSER MODULE</text>
+  <text x="60" y="865" font-family="Times, serif" font-size="9" fill="#000000">150 - EXECUTION ENGINE</text>
+  <text x="60" y="880" font-family="Times, serif" font-size="9" fill="#000000">160 - PRESENTATION SERVICE</text>
+  
+  <text x="350" y="790" font-family="Times, serif" font-size="9" fill="#000000">200 - OFFLINE PROCESSING SUBSYSTEM</text>
+  <text x="350" y="805" font-family="Times, serif" font-size="9" fill="#000000">210 - DIRECTORY SCANNER</text>
+  <text x="350" y="820" font-family="Times, serif" font-size="9" fill="#000000">220 - ID ASSIGNER/PATH MAPPER</text>
+  <text x="350" y="835" font-family="Times, serif" font-size="9" fill="#000000">230 - CONTENT EXTRACTOR</text>
+  <text x="350" y="850" font-family="Times, serif" font-size="9" fill="#000000">240 - VISION AI OCR MODULE</text>
+  <text x="350" y="865" font-family="Times, serif" font-size="9" fill="#000000">250 - RAKE KEYWORD EXTRACTOR</text>
+  <text x="350" y="880" font-family="Times, serif" font-size="9" fill="#000000">260 - METADATA TRAINER</text>
+  <text x="350" y="895" font-family="Times, serif" font-size="9" fill="#000000">270 - METADATA STORE</text>
+  
+  <!-- Data flow legend -->
+  <rect x="700" y="750" width="300" height="100" fill="#ffffff" stroke="#000000" stroke-width="1"/>
+  <text x="710" y="770" font-family="Times, serif" font-size="11" font-weight="bold" fill="#000000">DATA FLOW LEGEND:</text>
+  <line x1="710" y1="785" x2="740" y2="785" stroke="#000000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="750" y="790" font-family="Times, serif" font-size="9" fill="#000000">Primary Data Flow</text>
+  <line x1="710" y1="805" x2="740" y2="805" stroke="#666666" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#dashedArrow)"/>
+  <text x="750" y="810" font-family="Times, serif" font-size="9" fill="#000000">Cross-Subsystem Connection</text>
+  <text x="710" y="830" font-family="Times, serif" font-size="9" fill="#000000">A-N: Reference Flow Identifiers</text>
+</svg>

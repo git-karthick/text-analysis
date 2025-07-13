@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#000" />
+    </marker>
+    <!-- User Interaction Pattern -->
+    <pattern id="userPattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#e3f2fd" />
+    </pattern>
+    <!-- Offline Processing Pattern -->
+    <pattern id="offlinePattern" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#fff3e0" />
+    </pattern>
+  </defs>
+  <!-- Background -->
+  <rect x="0" y="0" width="1400" height="900" fill="#fff" stroke="#000" stroke-width="2" />
+  <!-- Title -->
+  <text x="50" y="50" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">SYSTEM ARCHITECTURE</text>
+  
+  <!-- User Interaction Subsystem -->
+  <g transform="translate(50 80)">
+    <rect x="0" y="0" width="600" height="400" fill="url(#userPattern)" stroke="#1e88e5" stroke-width="3" rx="5" />
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e88e5">USER INTERACTION SUBSYSTEM</text>
+    <!-- User Voice Input Module -->
+    <g transform="translate(20 60)">
+      <rect x="0" y="0" width="140" height="80" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5" rx="5" />
+      <!-- Microphone Icon -->
+      <path d="M 20 20 A 5 5 0 0 1 20 30 M 18 30 H 22 V 38 H 18" fill="none" stroke="#0288d1" stroke-width="2" />
+      <text x="40" y="40" font-family="Arial, sans-serif" font-size="10" fill="#333">User Voice Input</text>
+    </g>
+    <!-- Voice-to-Text Conversion Module -->
+    <g transform="translate(180 60)">
+      <rect x="0" y="0" width="140" height="80" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5" rx="5" />
+      <!-- Speech Bubble Icon -->
+      <path d="M 20 20 H 30 V 30 H 20 L 15 35 V 30 H 10 V 20 H 20" fill="none" stroke="#0288d1" stroke-width="2" />
+      <text x="40" y="40" font-family="Arial, sans-serif" font-size="10" fill="#333">Voice-to-Text Conversion</text>
+    </g>
+    <!-- Arrow from User Voice Input to Voice-to-Text -->
+    <path d="M 160 100 H 180" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrowhead)" />
+  </g>
+
+  <!-- Offline Processing Subsystem -->
+  <g transform="translate(750 80)">
+    <rect x="0" y="0" width="600" height="400" fill="url(#offlinePattern)" stroke="#ff9800" stroke-width="3" rx="5" />
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ff9800">OFFLINE PROCESSING SUBSYSTEM</text>
+    <!-- Text Processing Module -->
+    <g transform="translate(20 60)">
+      <rect x="0" y="0" width="140" height="80" fill="#ffffff" stroke="#ff9800" stroke-width="1.5" rx="5" />
+      <!-- Document Icon -->
+      <path d="M 15 20 H 25 V 35 H 15 V 20 M 17 22 H 23" fill="none" stroke="#f57c00" stroke-width="2" />
+      <text x="40" y="40" font-family="Arial, sans-serif" font-size="10" fill="#333">Text Processing</text>
+    </g>
+    <!-- Data Storage Module -->
+    <g transform="translate(180 60)">
+      <rect x="0" y="0" width="140" height="80" fill="#ffffff" stroke="#ff9800" stroke-width="1.5" rx="5" />
+      <!-- Database Icon -->
+      <path d="M 15 20 H 25 V 35 H 15 V 20 M 15 25 H 25" fill="none" stroke="#f57c00" stroke-width="2" />
+      <text x="40" y="40" font-family="Arial, sans-serif" font-size="10" fill="#333">Data Storage</text>
+    </g>
+    <!-- Arrow from Text Processing to Data Storage -->
+    <path d="M 160 100 H 180" stroke="#ff9800" stroke-width="2" marker-end="url(#arrowhead)" />
+  </g>
+
+  <!-- Cross-Subsystem Arrow (Voice-to-Text to Text Processing) -->
+  <path d="M 650 180 H 750" stroke="#000" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead)" />
+</svg>
