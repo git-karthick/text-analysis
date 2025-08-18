@@ -1,0 +1,6 @@
+Good morning/afternoon, everyone. Today, I want to talk about our work this year on integrating the Connie chatbot into our TrBIS application. Connie is a conversational AI chatbot for CFO tasks.
+In the TrBIS application, our support team receives the same questions from users frequently, based on repeated requests. For example, “Whom is the account pending with?” or “Who is the primary contact for this account?” We plan to answer these types of queries using Connie, and we are configuring it now to connect to our database through an API.
+Right now, this is still in the development stage. We plan to move a few of these questions to production starting in September. After that, we’ll listen to user feedback and add more questions as needed.
+Once it’s live, the current set of questions should save about 6 to 8 hours of manual work each week for the support team. That means less time on repetitive questions and more time for other tasks.
+Connie uses an NLP model right now to handle questions. But the team is working on a new LLM model, which will support more natural ways to answer user questions.
+Overall, this integration will make things smoother for users and our team. We’re excited to roll it out and see how it helps. Any questions? Thank you.
