@@ -159,3 +159,190 @@ Sources
 [4] Impersonation without password in .NET Core · Issue #5021 - GitHub https://github.com/dotnet/core/issues/5021
 [5] Impersonating and Reverting - .NET - Microsoft Learn https://learn.microsoft.com/en-us/dotnet/standard/security/impersonating-and-reverting
 [6] Adding user impersonation to an ASP.NET Core web application https://www.thereformedprogrammer.net/adding-user-impersonation-to-an-asp-net-core-web-application/
+
+### Implementing Flexible User Impersonation in .NET 8 API
+
+To support impersonation in your .NET 8 API with current Windows Authentication while preparing for future SSO (e.g., via OpenID Connect or Azure AD), focus on a claims-based approach. This simulates impersonation by creating a new authentication principal for the target user, which works across auth schemes. It doesn't require passwords and relies on admin privileges to switch contexts.
+
+Windows Auth provides the user identity via `WindowsIdentity`, but for SSO, you'll use claims like "sub" or "preferred_username". The code below uses ASP.NET Core Identity for user management (adaptable to your user store) and signs in with cookies for session tracking. For stateless APIs, you could swap to JWTs.
+
+#### Prerequisites
+- Install packages: `Microsoft.AspNetCore.Identity.EntityFrameworkCore` (if using EF for users) and ensure your app has a user store (e.g., database with `ApplicationUser` class extending `IdentityUser`).
+- This builds on your existing setup with sessions and Windows Auth.
+
+#### Step 1: Configure Services in Program.cs
+Update `Program.cs` to include Identity, authentication, and an admin policy. Add SSO placeholders for future integration.
+
+```csharp
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore; // If using EF
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add Identity services (adapt to your DbContext)
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+// Session setup (from your previous code)
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Authentication: Windows now, SSO later
+builder.Services.AddAuthentication("Windows")
+    .AddNegotiate(); // Windows Auth
+
+// Future SSO (uncomment and configure when ready):
+// builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+//     .AddOpenIdConnect(options =>
+//     {
+//         options.Authority = "https://your-sso-provider.com";
+//         options.ClientId = "your-client-id";
+//         options.ClientSecret = "your-secret";
+//         options.ResponseType = "code";
+//         options.SaveTokens = true;
+//         // Map claims as needed
+//     });
+
+// Authorization policy for admins
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
+
+var app = builder.Build();
+
+// Middleware pipeline
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseSession();
+app.UseMiddleware<SessionStartMiddleware>(); // Your custom middleware from before
+
+app.MapControllers();
+app.Run();
+```
+
+#### Step 2: Impersonation Controller
+Create a controller for starting/stopping impersonation. It uses `SignInManager` to handle sign-ins, pulling user details from Identity. For Windows Auth, it falls back to `User.Identity.Name`; for SSO, it uses claims.
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.Threading.Tasks;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Policy = "AdminOnly")] // Restrict to admins
+public class ImpersonationController : ControllerBase
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
+
+    public ImpersonationController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
+    {
+        _userManager = userManager;
+        _signInManager = signInManager;
+    }
+
+    [HttpPost("start/{targetUserId}")]
+    public async Task<IActionResult> StartImpersonation(string targetUserId)
+    {
+        // Get current user ID (Windows Auth fallback, SSO uses claims)
+        string currentUserId = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var targetUser = await _userManager.FindByIdAsync(targetUserId);
+        if (targetUser == null) return NotFound("Target user not found");
+
+        // Create principal for target user
+        var targetPrincipal = await _signInManager.CreateUserPrincipalAsync(targetUser);
+
+        // Track impersonation with custom claims
+        targetPrincipal.Identities.First().AddClaim(new Claim("OriginalUserId", currentUserId));
+        targetPrincipal.Identities.First().AddClaim(new Claim("IsImpersonating", "true"));
+
+        // Sign out current session and sign in as target
+        await _signInManager.SignOutAsync();
+        await _signInManager.SignInAsync(targetUser, isPersistent: false); // Or use HttpContext.SignInAsync for custom schemes
+
+        // Update session if needed
+        HttpContext.Session.SetString("ImpersonatedUser", targetUserId);
+
+        return Ok($"Impersonating {targetUser.UserName}");
+    }
+
+    [HttpPost("stop")]
+    public async Task<IActionResult> StopImpersonation()
+    {
+        if (!User.HasClaim("IsImpersonating", "true")) return BadRequest("Not currently impersonating");
+
+        string originalUserId = User.FindFirstValue("OriginalUserId");
+        var originalUser = await _userManager.FindByIdAsync(originalUserId);
+        if (originalUser == null) return NotFound("Original user not found");
+
+        // Sign out impersonated session and sign back in as original
+        await _signInManager.SignOutAsync();
+        await _signInManager.SignInAsync(originalUser, isPersistent: false);
+
+        HttpContext.Session.Remove("ImpersonatedUser");
+
+        return Ok("Impersonation stopped");
+    }
+}
+```
+
+#### Step 3: Update Session Middleware for Impersonation
+Adapt your existing `SessionStartMiddleware` to detect impersonation and use the appropriate user ID.
+
+```csharp
+public async Task InvokeAsync(HttpContext context)
+{
+    const string sessionFlagKey = "SessionStarted";
+    if (string.IsNullOrEmpty(context.Session.GetString(sessionFlagKey)))
+    {
+        // Default to Windows Auth
+        string userId = context.User.Identity?.Name;
+
+        // If impersonating, use the target user's ID
+        if (context.User.HasClaim("IsImpersonating", "true"))
+        {
+            userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        }
+        // For SSO, this claims check will naturally adapt (e.g., use "sub" claim if needed)
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            await CallYourProcedureAsync(userId);
+        }
+
+        context.Session.SetString(sessionFlagKey, "true");
+    }
+
+    await _next(context);
+}
+```
+
+#### Usage and Testing
+- **Start Impersonation**: As an admin, POST to `/api/impersonation/start/{targetUserId}`.
+- **Stop**: POST to `/api/impersonation/stop`.
+- **Windows Auth**: It uses `User.Identity.Name` by default.
+- **SSO Transition**: When you add SSO, update the auth services and claims mapping. The code will use SSO claims without changes, as long as your user store integrates with the identity provider.
+- **Security**: Use this only for testing—log all impersonations and ensure HTTPS. For resource-level Windows impersonation (e.g., file access), wrap code in `WindowsIdentity.RunImpersonated` blocks, but that requires credentials[1][2].
+
+This keeps your app flexible for the SSO shift while working seamlessly with Windows Auth[3][4].
+
+Sources
+[1] Implement impersonation in an ASP.NET application - Microsoft Learn https://learn.microsoft.com/en-us/troubleshoot/developer/webapps/aspnet/development/implement-impersonation
+[2] Impersonating and Reverting - .NET - Microsoft Learn https://learn.microsoft.com/en-us/dotnet/standard/security/impersonating-and-reverting
+[3] User impersonation in Asp.Net Core - Trailmax Tech https://tech.trailmax.info/2017/07/user-impersonation-in-asp-net-core/
+[4] Adding user impersonation to an ASP.NET Core web application https://www.thereformedprogrammer.net/adding-user-impersonation-to-an-asp-net-core-web-application/
+
