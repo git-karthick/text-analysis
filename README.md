@@ -346,3 +346,299 @@ Sources
 [3] User impersonation in Asp.Net Core - Trailmax Tech https://tech.trailmax.info/2017/07/user-impersonation-in-asp-net-core/
 [4] Adding user impersonation to an ASP.NET Core web application https://www.thereformedprogrammer.net/adding-user-impersonation-to-an-asp-net-core-web-application/
 
+A clean way to support impersonation without ASP.NET Core Identity is to keep Windows as the primary auth (Negotiate) and add a lightweight cookie scheme that carries an impersonated ClaimsPrincipal; a policy scheme selects the cookie when present, otherwise it falls back to Windows, so no Identity dependency is required and the core logic can remain in a shared project. This works now with **Windows** and is easy to extend to SSO later by adding another scheme while keeping the same impersonation cookie approach.[1][2][3][4][5]
+
+## Design overview
+- Use Negotiate for Windows Authentication to populate HttpContext.User for normal requests.[3][5]
+- Add a cookie scheme (for example, "Impersonation") that signs in a fabricated ClaimsPrincipal from the custom user table; no ASP.NET Core Identity needed.[6][4]
+- Add a policy scheme as the default authentication scheme that routes to the impersonation cookie if that cookie exists on the request; otherwise route to Negotiate, keeping behavior seamless.[2][1]
+- Keep user lookup and “procedure” logic in a core project service; controllers and middleware just call that service.[1]
+
+## Auth configuration (Program.cs)
+```csharp
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Negotiate;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Core services from the shared/core project
+builder.Services.AddScoped<IUserDirectory, UserDirectory>();           // custom user table lookup
+builder.Services.AddScoped<IImpersonationClaimsFactory, ImpersonationClaimsFactory>();
+builder.Services.AddScoped<IProcedureService, ProcedureService>();
+
+// Sessions (optional, if already used)
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(o =>
+{
+    o.IdleTimeout = TimeSpan.FromMinutes(30);
+    o.Cookie.HttpOnly = true;
+    o.Cookie.IsEssential = true;
+});
+
+// Authentication: dynamic default (cookie if present, else Windows)
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = "Dynamic";
+    options.DefaultChallengeScheme = "Dynamic";
+})
+.AddPolicyScheme("Dynamic", "Dynamic", options =>
+{
+    options.ForwardDefaultSelector = context =>
+    {
+        // choose cookie if impersonation cookie exists, else Windows Negotiate
+        return context.Request.Cookies.ContainsKey(".Impersonation") 
+            ? "Impersonation" 
+            : NegotiateDefaults.AuthenticationScheme;
+    };
+})
+.AddNegotiate() // Windows Authentication
+.AddCookie("Impersonation", options =>
+{
+    options.Cookie.Name = ".Impersonation";
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.Events = new CookieAuthenticationEvents
+    {
+        // Optional: harden cookie usage
+        OnValidatePrincipal = ctx => Task.CompletedTask
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// Pipeline
+var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseSession();
+
+// Optional: session-start middleware that calls the procedure
+app.UseMiddleware<SessionStartMiddleware>();
+
+app.MapControllers();
+app.Run();
+```
+This uses Negotiate for Windows and a cookie scheme for impersonation, with a policy scheme (“Dynamic”) that chooses the cookie when present, otherwise Windows; the cookie approach avoids ASP.NET Core Identity entirely.[4][5][2][3]
+
+## Impersonation controller (no Identity)
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize] // add a stricter policy if needed (e.g., only helpdesk/admins)
+public class ImpersonationController : ControllerBase
+{
+    private readonly IUserDirectory _users;
+    private readonly IImpersonationClaimsFactory _claimsFactory;
+    private readonly IProcedureService _procedure;
+
+    public ImpersonationController(
+        IUserDirectory users,
+        IImpersonationClaimsFactory claimsFactory,
+        IProcedureService procedure)
+    {
+        _users = users;
+        _claimsFactory = claimsFactory;
+        _procedure = procedure;
+    }
+
+    // Start impersonation by login name or internal user id from custom user table
+    [HttpPost("start")]
+    public async Task<IActionResult> Start([FromBody] StartImpersonationRequest req)
+    {
+        // Original (Windows) user
+        var originalLogin = User.Identity?.Name ?? "unknown";
+
+        // Lookup target user in custom table
+        var targetUser = await _users.FindAsync(req.UserIdentifier); // e.g., "domain\\jdoe" or internal ID
+        if (targetUser == null) return NotFound("Target user not found");
+
+        // Build impersonation claims
+        var claims = _claimsFactory.Create(targetUser);
+        claims.Add(new Claim("impersonation:is", "true"));
+        claims.Add(new Claim("impersonation:original", originalLogin));
+
+        var identity = new ClaimsIdentity(claims, authenticationType: "Impersonation");
+        var principal = new ClaimsPrincipal(identity);
+
+        // Sign in using the impersonation cookie scheme
+        await HttpContext.SignInAsync("Impersonation", principal, new AuthenticationProperties
+        {
+            IsPersistent = false,
+            AllowRefresh = true
+        });
+
+        // Write session keys (optional)
+        HttpContext.Session.SetString("ImpersonatedUser", targetUser.Id);
+        HttpContext.Session.Remove("SessionStarted"); // force next request to re-run session-start logic
+
+        // Immediately trigger the procedure (if needed now) with impersonated user
+        await _procedure.OnSessionStartAsync(targetUser.Id);
+
+        return Ok(new { message = $"Impersonating {targetUser.DisplayName}" });
+    }
+
+    [HttpPost("stop")]
+    public async Task<IActionResult> Stop()
+    {
+        // Read original user from current cookie principal (if any)
+        var original = User.FindFirst("impersonation:original")?.Value ?? User.Identity?.Name ?? "unknown";
+
+        // Sign out of impersonation cookie to fall back to Windows automatically
+        await HttpContext.SignOutAsync("Impersonation");
+
+        // Clear session indicators
+        HttpContext.Session.Remove("ImpersonatedUser");
+        HttpContext.Session.Remove("SessionStarted"); // force next request to re-run session-start logic
+
+        // Optionally trigger procedure for original user context
+        await _procedure.OnSessionStartAsync(original);
+
+        return Ok(new { message = "Impersonation stopped" });
+    }
+}
+
+public sealed class StartImpersonationRequest
+{
+    public string UserIdentifier { get; set; } = string.Empty; // e.g., login or custom id
+}
+```
+This signs in an impersonation ClaimsPrincipal using only the cookie scheme, with the policy scheme ensuring it overrides Windows only while the cookie exists.[2][4][1]
+
+## Session middleware (uses cookie or Windows)
+```csharp
+using System.Security.Claims;
+
+public sealed class SessionStartMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly IProcedureService _procedure;
+
+    public SessionStartMiddleware(RequestDelegate next, IProcedureService procedure)
+    {
+        _next = next;
+        _procedure = procedure;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        const string flag = "SessionStarted";
+
+        if (string.IsNullOrEmpty(context.Session.GetString(flag)))
+        {
+            string? effectiveUserId = null;
+
+            // Prefer impersonated user id in claims (from custom user table)
+            if (context.User?.Identity?.IsAuthenticated == true &&
+                context.User.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) &&
+                context.User.HasClaim(c => c.Type == "impersonation:is" && c.Value == "true"))
+            {
+                effectiveUserId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            }
+            else
+            {
+                // Fall back to Windows login name
+                effectiveUserId = context.User?.Identity?.Name;
+            }
+
+            if (!string.IsNullOrWhiteSpace(effectiveUserId))
+            {
+                await _procedure.OnSessionStartAsync(effectiveUserId);
+            }
+
+            context.Session.SetString(flag, "true");
+        }
+
+        await _next(context);
+    }
+}
+```
+The middleware prefers the impersonated identity from the cookie; otherwise it uses Windows’ HttpContext.User from Negotiate, and it can be left in the API while sharing core business logic through a service.[5][4][1]
+
+## Core services (in the core/shared project)
+```csharp
+public interface IUserDirectory
+{
+    Task<AppUser?> FindAsync(string userIdentifier);
+}
+
+// Convert your custom user to a consistent claim set for the cookie
+public interface IImpersonationClaimsFactory
+{
+    List<Claim> Create(AppUser user);
+}
+
+public interface IProcedureService
+{
+    Task OnSessionStartAsync(string userIdOrLogin);
+}
+
+// Example implementations (simplified)
+public sealed class ImpersonationClaimsFactory : IImpersonationClaimsFactory
+{
+    public List<Claim> Create(AppUser user)
+    {
+        var claims = new List<Claim>
+        {
+            // NameIdentifier should carry your stable internal user id (or login if that's the key)
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.Login),             // display/login
+            new Claim("display_name", user.DisplayName ?? user.Login)
+        };
+
+        // Add roles/groups if needed for authorization
+        foreach (var role in user.Roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
+
+        return claims;
+    }
+}
+
+public sealed class ProcedureService : IProcedureService
+{
+    public Task OnSessionStartAsync(string userIdOrLogin)
+    {
+        // Call the stored procedure / audit / logging / etc.
+        return Task.CompletedTask;
+    }
+}
+```
+Keeping user lookup and claim shaping in the core project makes the controller thin, and the same service is reused by middleware for immediate and per-request flows.[1]
+
+## Why this works and scales to SSO
+- Negotiate remains the authoritative Windows auth; the app only “overrides” with a cookie when impersonating, chosen via a policy scheme at runtime per request.[5][2]
+- The impersonation cookie is created via SignInAsync on a ClaimsPrincipal—no ASP.NET Core Identity required.[6][4]
+- To add SSO later, register OIDC/JWT and adjust the policy scheme selector to prefer the impersonation cookie first, then SSO, else Windows, without changing the impersonation controller or core services.[2][1]
+
+## Notes
+- Only privileged users should be allowed to start/stop impersonation, enforced by authorization policies or Windows groups.[1]
+- Ensure Data Protection is configured when running multiple instances so the cookie can be decrypted everywhere.[4]
+- Negotiate specifics vary by hosting (IIS, Kestrel, HTTP.sys); follow the Windows auth doc for server-side configuration.[5]
+
+[1](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/?view=aspnetcore-9.0)
+[2](https://weblog.west-wind.com/posts/2022/Mar/29/Combining-Bearer-Token-and-Cookie-Authentication-in-ASPNET)
+[3](https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.authentication.negotiate?view=aspnetcore-9.0)
+[4](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-9.0)
+[5](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/windowsauth?view=aspnetcore-9.0)
+[6](https://www.meziantou.net/cookie-authentication-in-asp-net-core-2-without-asp-net-identity.htm)
+[7](https://stackoverflow.com/questions/78920752/net-core-multiple-cookie-authentication-schemes)
+[8](https://learn.microsoft.com/en-us/aspnet/core/security/cookie-sharing?view=aspnetcore-9.0)
+[9](https://code-maze.com/dotnet-multiple-authentication-schemes/)
+[10](https://www.nuget.org/packages/Microsoft.AspNetCore.Authentication.Negotiate/10.0.0-preview.5.25277.114)
+[11](https://www.youtube.com/watch?v=dsuPRZ6V9Xg)
+[12](https://www.reddit.com/r/dotnet/comments/1c4ikrk/combine_windows_authentication_with_aspnet_core/)
+[13](https://stackoverflow.com/questions/65690233/failing-to-perform-cookie-authentication-signinasync-and-authenticateasync-not)
+[14](https://dario.griffo.io/posts/multiple-authentication-dotnet/)
+[15](https://stackoverflow.com/questions/68916846/how-to-use-windows-authentication-on-asp-net-core-subpath-only)
+[16](https://learn.microsoft.com/en-us/answers/questions/2169294/cookie-authentication-without-asp)net-core-identiy)
+[17](https://www.youtube.com/watch?v=Cet54urCj70)
+[18](https://www.nuget.org/packages/Microsoft.AspNetCore.Authentication.Negotiate)
+[19](https://www.c-sharpcorner.com/article/cookie-authentication-in-asp-net-core/)
+[20](https://docs.duendesoftware.com/identityserver/ui/login/windows/)
+
