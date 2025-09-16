@@ -1,177 +1,296 @@
-### Resolving HttpContext.User Not Updating in Custom Middleware (Dev vs. Production)
+Yes—TanStack Table can be wrapped into a generic, Chakra-styled, server-side table so the same component is reused anywhere while delegating data-fetching to an existing useApiQuery hook. This approach relies on TanStack’s headless table core with manual pagination/sorting and Chakra’s table primitives rendered via flexRender.[1][2][3][4]
 
-Based on your description, the impersonated user (via the cookie scheme) is correctly reflected in development-specific code (e.g., inside `if (app.Environment.IsDevelopment())` blocks in Program.cs), but not in your custom `SessionStartMiddleware` in production or non-dev environments. This is a common issue in ASP.NET Core due to **environment-specific behaviors** in authentication, cookie handling, and middleware execution[1][2][3].
+### Component design
+- The reusable component accepts columns, a fetch key, an input filter, and a mapper that converts TanStack’s sorting state into SortBy/IsSortAscending for the BisViewAccountFilterRequest, while using manualPagination and manualSorting to delegate data operations to the backend.[5][1]
+- Rendering uses Chakra’s Table, Thead, Tbody, Th, and Td with TanStack’s flexRender so the same core can be dropped into any page with consistent styling.[2][4]
+- The component exposes props for pageSize options, initial pagination/sort, and a stable query key to plug straight into the existing useApiQuery hook.[3][5]
 
-#### Likely Causes
-- **HTTPS Differences**: In production, cookie authentication often requires HTTPS for security (e.g., `CookieSecurePolicy.Always`), and without it, the impersonation cookie might not be set or read, leading to `HttpContext.User` falling back to Windows auth instead of the impersonated principal[2]. Development (e.g., IIS Express) might bypass this or use HTTP.
-- **Middleware Order and Request Lifecycle**: Custom middleware might run before authentication fully populates `HttpContext.User`, especially if order differs by environment. In dev, additional logging or conditional middleware could inadvertently "refresh" the context[4][5].
-- **Environment-Specific Config**: Development might enable relaxed settings (e.g., no HTTPS redirection), allowing the cookie to work, while production enforces stricter rules[1][6].
-- **Cookie Visibility**: The impersonation cookie (".Impersonation") might not be accessible in middleware due to secure flags or same-site policies differing between environments[7][3].
+### Type contracts
+The following types mirror the backend DTOs and enable full typing for columns and results.[1][3]
 
-This works in your dev check because it's likely executed after the full pipeline, but middleware sees an earlier, unupdated `HttpContext.User`[8][9].
+```ts
+// types.ts
+export type AccountRow = {
+  bankId: number;
+  accountNumber: string;
+  bankAccountId: string;
+  newStatus: string;
+  status: string;
+  glAccountNumber: string;
+  ownerStatus: string;
+  bankName: string;
+  carrierZip: string;
+};
 
-#### Fixes: Make It Consistent Across Environments
-Update your code to enforce consistent behavior. Focus on middleware order, cookie security, and forcing a refresh after impersonation. Test in both dev and prod (e.g., deploy to IIS or use `dotnet run --environment Production`).
+export type QueryResult<T> = {
+  totalItems: number;
+  items: T[];
+};
 
-##### Step 1: Update Program.cs for Consistent Config
-Remove or minimize environment-specific differences. Add HTTPS redirection in dev too (for testing), and set cookie policies to work everywhere. Ensure auth middleware runs early.
+export type BisViewAccountFilterRequest = {
+  BankId?: number;
+  AccountNumber?: string;
+  BankAccountId?: string;
+  NewStatus?: string;
+  Status?: string;
+  SortBy?: string;
+  IsSortAscending?: boolean;
+  Page?: number;
+  PageSize?: number;
+};
+```
+These interfaces align with TanStack’s generic ColumnDef<T> usage and the manual server-side model.[5][1]
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+### Reusable DataTable component
+The code below implements a generic DataTable<T> using TanStack’s useReactTable with manualPagination and manualSorting; it delegates fetching to a provided getQuery function that wraps the existing useApiQuery hook.[1][5]
 
-// ... (your existing services: auth schemes, IUserDirectory, etc.)
+```tsx
+// DataTable.tsx
+import React from "react";
+import {
+  Table, TableContainer, Thead, Tbody, Tr, Th, Td,
+  HStack, Button, Select, Spinner, Text, Box
+} from "@chakra-ui/react";
+import {
+  ColumnDef, flexRender, getCoreRowModel, useReactTable, SortingState
+} from "@tanstack/react-table";
 
-// Cookie options: Set SecurePolicy to None for dev testing, but Always for prod
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = "Dynamic";
-    options.DefaultChallengeScheme = "Dynamic";
-})
-.AddPolicyScheme("Dynamic", "Dynamic", options =>
-{
-    options.ForwardDefaultSelector = context =>
-        context.Request.Cookies.ContainsKey(".Impersonation") 
-            ? "Impersonation" 
-            : NegotiateDefaults.AuthenticationScheme;
-})
-.AddNegotiate()
-.AddCookie("Impersonation", options =>
-{
-    options.Cookie.Name = ".Impersonation";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Flexible for dev/prod (use Always in prod for security)
-    options.Cookie.SameSite = SameSiteMode.Lax; // Helps with cross-site issues
-    options.SlidingExpiration = true;
-    options.ExpireTimeSpan = TimeSpan.FromHours(8);
-});
+type QueryResult<T> = { totalItems: number; items: T[]; };
 
-var app = builder.Build();
+export type DataTableProps<TData, TFilter> = {
+  columns: ColumnDef<TData, any>[];
+  // Maps TanStack columnId -> backend field (for SortBy)
+  sortFieldMap?: Record<string, string>;
+  initialFilter?: Partial<TFilter>;
+  pageSizeOptions?: number[];
+  initialPageSize?: number;
+  initialSort?: SortingState;
+  // Integrate existing useApiQuery hook via this factory
+  // It must return { data, isFetching, refetch } and accept the request payload as deps
+  getQuery: (payload: any) => {
+    data: QueryResult<TData> | undefined;
+    isFetching: boolean;
+    refetch?: () => void;
+  };
+};
 
-// Pipeline: Consistent order, add HTTPS redirection even in dev for testing
-app.UseRouting();
-app.UseAuthentication(); // Early to populate HttpContext.User
-app.UseAuthorization();
-app.UseSession();
-app.UseMiddleware<SessionStartMiddleware>(); // After auth/session
+export function DataTable<TData, TFilter>({
+  columns,
+  sortFieldMap = {},
+  initialFilter,
+  pageSizeOptions = [10, 20, 50, 100],
+  initialPageSize = 20,
+  initialSort = [],
+  getQuery,
+}: DataTableProps<TData, TFilter>) {
+  const [sorting, setSorting] = React.useState<SortingState>(initialSort);
+  const [pageIndex, setPageIndex] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(initialPageSize);
 
-// Conditional HTTPS (enable in dev for consistency)
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection(); // Enforce HTTPS in prod
+  const mapSorting = (s: SortingState) => {
+    if (s.length === 0) return { SortBy: undefined, IsSortAscending: undefined };
+    const first = s;
+    const apiField = sortFieldMap[first.id] ?? first.id;
+    return { SortBy: apiField, IsSortAscending: first.desc ? false : true };
+  };
+
+  const requestPayload = {
+    ...(initialFilter as object),
+    ...mapSorting(sorting),
+    Page: pageIndex,
+    PageSize: pageSize,
+  };
+
+  const { data, isFetching } = getQuery(requestPayload);
+
+  const table = useReactTable({
+    data: data?.items ?? [],
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+    onSortingChange: setSorting,
+    state: { sorting, pagination: { pageIndex, pageSize } },
+    pageCount: Math.max(1, Math.ceil((data?.totalItems ?? 0) / pageSize)),
+  });
+
+  const total = data?.totalItems ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <Box>
+      <TableContainer>
+        <Table size="sm" variant="simple">
+          <Thead>
+            {table.getHeaderGroups().map(hg => (
+              <Tr key={hg.id}>
+                {hg.headers.map(header => {
+                  const canSort = header.column.getCanSort();
+                  const sortDir = header.column.getIsSorted();
+                  return (
+                    <Th
+                      key={header.id}
+                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                      cursor={canSort ? "pointer" : "default"}
+                      isNumeric={header.column.columnDef.meta?.isNumeric}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sortDir ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                    </Th>
+                  );
+                })}
+              </Tr>
+            ))}
+          </Thead>
+          <Tbody>
+            {isFetching ? (
+              <Tr>
+                <Td colSpan={columns.length}>
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text>Loading…</Text>
+                  </HStack>
+                </Td>
+              </Tr>
+            ) : (
+              table.getRowModel().rows.map(row => (
+                <Tr key={row.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <Td key={cell.id} isNumeric={cell.column.columnDef.meta?.isNumeric}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </Td>
+                  ))}
+                </Tr>
+              ))
+            )}
+          </Tbody>
+        </Table>
+      </TableContainer>
+
+      <HStack justify="space-between" mt={3}>
+        <HStack>
+          <Button size="sm" onClick={() => setPageIndex(0)} isDisabled={pageIndex === 0 || isFetching}>First</Button>
+          <Button size="sm" onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} isDisabled={pageIndex === 0 || isFetching}>Prev</Button>
+          <Button
+            size="sm"
+            onClick={() => setPageIndex(Math.min(pageCount - 1, pageIndex + 1))}
+            isDisabled={pageIndex >= pageCount - 1 || isFetching}
+          >
+            Next
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setPageIndex(pageCount - 1)}
+            isDisabled={pageIndex >= pageCount - 1 || isFetching}
+          >
+            Last
+          </Button>
+        </HStack>
+
+        <HStack>
+          <Text>Page {pageIndex + 1} of {pageCount} • {total} rows</Text>
+          <Select
+            size="sm"
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setPageIndex(0); }}
+            width="auto"
+          >
+            {pageSizeOptions.map(ps => <option key={ps} value={ps}>{ps} / page</option>)}
+          </Select>
+        </HStack>
+      </HStack>
+    </Box>
+  );
 }
-else
-{
-    // For dev testing: Optionally force HTTPS simulation or log User
-    app.Use(async (context, next) =>
-    {
-        Console.WriteLine($"Dev: User before middleware: {context.User?.Identity?.Name}");
-        await next();
-    });
-}
-
-app.MapControllers();
-app.Run();
 ```
+This implementation follows TanStack’s server-side model by setting manualPagination/manualSorting and calculating pageCount from totalItems.[5][1]
 
-##### Step 2: Update SessionStartMiddleware with Robust Checks
-Inject `IHttpContextAccessor` for reliable access (helps in edge cases where context isn't fully propagated)[3]. Add logging to debug `User` state.
+### Wiring with useApiQuery
+This example shows how to reuse the component for the BIS Accounts API, assuming useApiQuery accepts a key, url, and body and returns { data, isFetching }.[6][5]
 
-```csharp
-public sealed class SessionStartMiddleware
-{
-    private readonly RequestDelegate _next;
-    private readonly IProcedureService _procedure;
-    private readonly IHttpContextAccessor _accessor; // For consistent HttpContext access
+```tsx
+// AccountsPage.tsx
+import { createColumnHelper, ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "./DataTable";
+import type { AccountRow, BisViewAccountFilterRequest, QueryResult } from "./types";
+import { useApiQuery } from "../hooks/useApiQuery"; // existing reusable hook
 
-    public SessionStartMiddleware(RequestDelegate next, IProcedureService procedure, IHttpContextAccessor accessor)
-    {
-        _next = next;
-        _procedure = procedure;
-        _accessor = accessor;
-    }
+const columnHelper = createColumnHelper<AccountRow>();
 
-    public async Task InvokeAsync(HttpContext context)
-    {
-        var ctx = _accessor.HttpContext ?? context; // Use accessor for reliability
+const columns: ColumnDef<AccountRow, any>[] = [
+  columnHelper.accessor("bankId", { header: "Bank Id", meta: { isNumeric: true } }),
+  columnHelper.accessor("accountNumber", { header: "Account Number" }),
+  columnHelper.accessor("bankAccountId", { header: "Bank Account Id" }),
+  columnHelper.accessor("newStatus", { header: "New Status" }),
+  columnHelper.accessor("status", { header: "Status" }),
+  columnHelper.accessor("glAccountNumber", { header: "GL Account Number" }),
+  columnHelper.accessor("ownerStatus", { header: "Owner Status" }),
+  columnHelper.accessor("bankName", { header: "Bank Name" }),
+  columnHelper.accessor("carrierZip", { header: "Carrier Zip" }),
+];
 
-        await ctx.Session.LoadAsync(); // Ensure session is loaded post-auth
+const sortFieldMap: Record<string, string> = {
+  bankId: "bank_id",
+  accountNumber: "account_number",
+  bankAccountId: "bank_account_id",
+  newStatus: "new_status",
+  status: "status",
+  glAccountNumber: "gl_account_number",
+  ownerStatus: "owner_status",
+  bankName: "bank_name",
+  carrierZip: "carrier_zip",
+};
 
-        const string flag = "SessionStarted";
-        if (string.IsNullOrEmpty(ctx.Session.GetString(flag)))
-        {
-            string? effectiveUserId = null;
+export default function AccountsPage() {
+  const initialFilter: Partial<BisViewAccountFilterRequest> = {
+    SortBy: "bank_name",
+    IsSortAscending: false,
+    Page: 0,
+    PageSize: 20,
+  };
 
-            // Log for debugging (remove in prod)
-            Console.WriteLine($"Middleware: IsAuthenticated: {ctx.User?.Identity?.IsAuthenticated}, Name: {ctx.User?.Identity?.Name}");
-
-            if (ctx.User?.Identity?.IsAuthenticated == true)
-            {
-                if (ctx.User.HasClaim(c => c.Type == "impersonation:is" && c.Value == "true"))
-                {
-                    effectiveUserId = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier);
-                }
-                else
-                {
-                    effectiveUserId = ctx.User?.Identity?.Name;
-                }
-            }
-
-            // Session fallback
-            if (string.IsNullOrEmpty(effectiveUserId))
-            {
-                effectiveUserId = ctx.Session.GetString("ImpersonatedUser");
-            }
-
-            if (!string.IsNullOrWhiteSpace(effectiveUserId))
-            {
-                await _procedure.OnSessionStartAsync(effectiveUserId);
-            }
-
-            ctx.Session.SetString(flag, "true");
-        }
-
-        await _next(ctx);
-    }
+  return (
+    <DataTable<AccountRow, BisViewAccountFilterRequest>
+      columns={columns}
+      sortFieldMap={sortFieldMap}
+      initialFilter={initialFilter}
+      getQuery={(payload) =>
+        useApiQuery<QueryResult<AccountRow>>({
+          key: ["accounts", payload],
+          url: "/api/accounts/search",
+          method: "POST",
+          body: payload,
+          keepPreviousData: true,
+        })
+      }
+    />
+  );
 }
 ```
+This pattern keeps the table purely presentational and the fetching logic pluggable, following TanStack’s headless design and Chakra’s composable UI primitives.[4][3]
 
-Register `IHttpContextAccessor` in Program.cs if not already:
-```csharp
-builder.Services.AddHttpContextAccessor();
-```
+### Notes
+- manualPagination tells the table that incoming data is already paginated and requires either rowCount or pageCount; in this example pageCount is derived from totalItems for consistency.[1]
+- Sorting is lifted into component state and mapped to the backend via SortBy and IsSortAscending, matching TanStack’s manualSorting model and onSortingChange handler.[7][8]
+- The same DataTable can back any entity by changing columns, sortFieldMap, and the useApiQuery wrapper without altering internal table logic.[3][5]
 
-##### Step 3: Ensure Impersonation Forces a Refresh
-In `ImpersonationController`, after `SignInAsync`, redirect over HTTPS (or simulate in dev) to trigger a new request where middleware sees the updated `User`[10][9].
-
-```csharp
-// In Start/Stop methods (from previous code):
-await HttpContext.SignInAsync("Impersonation", principal, ...);
-
-// ... (set session keys)
-
-// Trigger procedure immediately
-await _procedure.OnSessionStartAsync(targetUser.Id);
-
-// Redirect (use HTTPS in prod)
-var redirectUrl = app.Environment.IsDevelopment() ? "/api/status" : "https://yourapp.com/api/status";
-return Redirect(redirectUrl);
-```
-
-#### Debugging Steps
-- **Logs**: Check console/output for `User` values in middleware vs. dev blocks. In prod, enable detailed logging (`builder.Logging.AddDebug();`).
-- **Test Prod-Like Dev**: Run dev with `DOTNET_ENVIRONMENT=Production` to simulate.
-- **Browser Tools**: Inspect cookies (".Impersonation") and ensure it's set with correct secure/same-site flags.
-- **If Still Issues**: Verify Windows Auth in prod (IIS config for Negotiate)[1]. If using Kestrel, enable HTTPS certs.
-
-This should make `HttpContext.User` update consistently in middleware across environments[1][2][3]. If you share logs or exact errors, I can refine further.
-
-Sources
-[1] Getting httpContext.User.Identity.Name when running ASP. ... https://stackoverflow.com/questions/75843221/getting-httpcontext-user-identity-name-when-running-asp-net-core-in-project-mode
-[2] HttpContext.User is not set in production unless using https https://github.com/dotnet/aspnetcore/issues/28481
-[3] How to Get HttpContext ASP.NET Core https://www.telerik.com/blogs/how-to-get-httpcontext-asp-net-core
-[4] ASP.NET custom middleware after authorization ... https://stackoverflow.com/questions/78419816/asp-net-custom-middleware-after-authorization-authentication
-[5] ASP.NET Core Middleware https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-9.0
-[6] Session and state management in ASP.NET Core - Microsoft Learn https://learn.microsoft.com/en-us/aspnet/core/fundamentals/app-state?view=aspnetcore-9.0
-[7] Use cookie authentication without ASP.NET Core Identity https://learn.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-9.0
-[8] Occasionally missing HttpContext.User info : r/aspnetcore https://www.reddit.com/r/aspnetcore/comments/y1ib4g/occasionally_missing_httpcontextuser_info/
-[9] httpContext.User claim is not updated after passing through ... https://stackoverflow.com/questions/76167640/httpcontext-user-claim-is-not-updated-after-passing-through-custom-authenticatio
-[10] ASP.NET Core: Three(+1) ways to refresh the claims of a ... https://www.thereformedprogrammer.net/asp-net-core-three-ways-to-refresh-the-claims-of-a-logged-in-user/
+[1](https://tanstack.com/table/v8/docs/guide/pagination)
+[2](https://hygraph.com/blog/react-table)
+[3](https://tanstack.com/table)
+[4](https://chakra-ui.com/docs/components/table)
+[5](https://tanstack.com/table/latest/docs/framework/react/guide/table-state)
+[6](https://refine.dev/docs/packages/tanstack-table/introduction/)
+[7](https://tanstack.com/table/v8/docs/guide/sorting)
+[8](https://tanstack.com/table/v8/docs/api/features/sorting)
+[9](https://dev.to/serhatgenc/creating-a-reusable-table-component-with-react-table-and-material-ui-10jd)
+[10](https://tanstack.com/table/v8/docs/framework/react/examples/pagination)
+[11](https://www.contentful.com/blog/tanstack-table-react-table/)
+[12](https://dev.to/esponges/create-a-reusable-react-table-component-with-typescript-56d4)
+[13](https://ui.shadcn.com/docs/components/data-table)
+[14](https://newbeelearn.com/blog/using-tanstack-table-in-react/)
+[15](https://stackoverflow.com/questions/74321216/tanstack-v8-react-table-how-to-sort-server-side-with-manualsorting)
+[16](https://blog.logrocket.com/tanstack-table-formerly-react-table/)
+[17](https://github.com/TanStack/table/discussions/2193)
+[18](https://www.material-react-table.com/docs/guides/pagination)
+[19](https://www.youtube.com/watch?v=F4zshDInsJY)
+[20](https://tanstack.com/table/latest/docs/framework/react/examples/basic)
