@@ -129,3 +129,181 @@ Sources
 [1] Getting the Current User in Clean Architecture https://www.milanjovanovic.tech/blog/getting-the-current-user-in-clean-architecture
 [2] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
 [3] Clean Architecture and Asp.Net Core Identity https://stackoverflow.com/questions/62865530/clean-architecture-and-asp-net-core-identity
+
+
+--------
+Here is a full implementation example of using `IClaimsTransformation` in your Clean Architecture project structure (API, Core, Infrastructure) to load user roles from the database and add them as claims:
+
+***
+
+### 1. Define User Entity and Role Service (Infrastructure Layer)
+
+```csharp
+// Infrastructure/Entities/User.cs
+public class User
+{
+    public string UserId { get; set; }
+    public string UserName { get; set; }
+    public List<string> Roles { get; set; }
+}
+
+// Infrastructure/Services/UserRepository.cs
+public interface IUserRepository
+{
+    Task<User> GetUserByUserNameAsync(string userName);
+}
+
+public class UserRepository : IUserRepository
+{
+    // Implement database fetch logic here
+    public async Task<User> GetUserByUserNameAsync(string userName)
+    {
+        // Fetch user with roles from DB, example only
+        return new User
+        {
+            UserId = "123",
+            UserName = userName,
+            Roles = new List<string> { "Admin", "User" }
+        };
+    }
+}
+```
+
+***
+
+### 2. Create Claims Transformation (API Layer)
+
+```csharp
+// API/Services/DbClaimsTransformation.cs
+using Microsoft.AspNetCore.Authentication;
+
+public class DbClaimsTransformation : IClaimsTransformation
+{
+    private readonly IUserRepository _userRepository;
+
+    public DbClaimsTransformation(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
+    {
+        var identity = (ClaimsIdentity)principal.Identity;
+        var userName = principal.Identity?.Name;
+
+        if (!string.IsNullOrEmpty(userName) && !identity.HasClaim(c => c.Type == ClaimTypes.Role))
+        {
+            var user = await _userRepository.GetUserByUserNameAsync(userName);
+            
+            if (user?.Roles != null)
+            {
+                foreach (var role in user.Roles)
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                }
+            }
+        }
+        return principal;
+    }
+}
+```
+
+***
+
+### 3. Implement User Context Abstraction (Core Project)
+
+```csharp
+// Core/Interfaces/ICurrentUser.cs
+public interface ICurrentUser
+{
+    string UserId { get; }
+    IEnumerable<string> Roles { get; }
+    bool IsAuthenticated { get; }
+}
+```
+
+***
+
+### 4. Implement User Context (Infrastructure or API Layer)
+
+```csharp
+// Infrastructure/Services/CurrentUser.cs
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
+
+public class CurrentUser : ICurrentUser
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public CurrentUser(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    public string UserId => _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+    public IEnumerable<string> Roles =>
+        _httpContextAccessor.HttpContext?.User?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? Enumerable.Empty<string>();
+
+    public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+}
+```
+
+***
+
+### 5. Register Dependencies in API Startup
+
+```csharp
+// API/Program.cs or Startup.cs (ConfigureServices)
+services.AddHttpContextAccessor();
+services.AddScoped<IUserRepository, UserRepository>();
+services.AddScoped<ICurrentUser, CurrentUser>();
+services.AddTransient<IClaimsTransformation, DbClaimsTransformation>();
+```
+
+***
+
+### 6. Usage Example in Core Service
+
+```csharp
+// Core/Services/MyService.cs
+public class MyService
+{
+    private readonly ICurrentUser _currentUser;
+
+    public MyService(ICurrentUser currentUser)
+    {
+        _currentUser = currentUser;
+    }
+
+    public void ExecuteBusinessLogic()
+    {
+        if (_currentUser.IsAuthenticated)
+        {
+            var roles = _currentUser.Roles;
+
+            if (roles.Contains("Admin"))
+            {
+                // Admin-specific logic here
+            }
+        }
+    }
+}
+```
+
+***
+
+### Summary:
+
+- Your **API layer** hosts the actual `IClaimsTransformation` implementation that queries the database for user roles.
+- Your **Infrastructure layer** implements user data access (repository) and the user context wrapper (`CurrentUser`).
+- Your **Core layer** defines only the `ICurrentUser` interface and depends on it in your business logic.
+- This clean separation aligns well with your project structure and Clean Architecture principles.
+
+This setup makes your app flexible, testable, and neatly separates concerns across layers[1][2][3].
+
+Sources
+[1] Getting the Current User in Clean Architecture https://www.milanjovanovic.tech/blog/getting-the-current-user-in-clean-architecture
+[2] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
+[3] Clean Architecture and Asp.Net Core Identity https://stackoverflow.com/questions/62865530/clean-architecture-and-asp-net-core-identity
+
