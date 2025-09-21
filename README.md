@@ -307,3 +307,77 @@ Sources
 [2] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
 [3] Clean Architecture and Asp.Net Core Identity https://stackoverflow.com/questions/62865530/clean-architecture-and-asp-net-core-identity
 
+
+
+Done !
+Yes, since `IClaimsTransformation.TransformAsync` runs on every authenticated request, it can have a performance impact if the logic inside (such as querying the database for user roles) is expensive or not optimized.
+
+### Performance Considerations
+
+- **Database Calls:** Querying roles/permissions from the database on every request adds latency and load, especially if the user makes many requests in a session.
+- **Claims Caching:** To avoid repeated database hits, it is common to:
+  - Cache user roles/permissions in a distributed cache (e.g., Redis, MemoryCache) keyed by user ID.
+  - Retrieve roles from cache in `TransformAsync`, only querying the DB on cache misses.
+- **Claims Persistence:** Many apps use tokens like JWTs where roles/permissions are serialized in the token itself, avoiding database fetch on each request.
+- **Balance Freshness and Performance:** If roles change infrequently, caching claims for some configurable duration improves performance without sacrificing correctness.
+- **Asynchronous Calls:** Because `TransformAsync` is async, it can be awaited efficiently to reduce blocking.
+
+### Summary
+
+| Aspect                   | Advice                                  |
+|--------------------------|-----------------------------------------|
+| Cost per request          | Moderate if DB calls are expensive      |
+| Mitigation               | Use caching for user roles/permissions  |
+| Alternative approaches   | JWT tokens with embedded roles           |
+| Tradeoff                 | Freshness of roles vs. request performance|
+
+***
+
+### Practical Optimization Example
+
+```csharp
+public class CachedClaimsTransformation : IClaimsTransformation
+{
+    private readonly IUserRepository _userRepository;
+    private readonly IMemoryCache _cache;
+
+    public CachedClaimsTransformation(IUserRepository userRepository, IMemoryCache cache)
+    {
+        _userRepository = userRepository;
+        _cache = cache;
+    }
+
+    public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
+    {
+        var identity = (ClaimsIdentity)principal.Identity;
+        var userName = principal.Identity?.Name;
+
+        if (string.IsNullOrEmpty(userName) || identity.HasClaim(c => c.Type == ClaimTypes.Role))
+            return principal;
+
+        var roles = await _cache.GetOrCreateAsync($"UserRoles-{userName}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
+            var user = await _userRepository.GetUserByUserNameAsync(userName);
+            return user?.Roles ?? new List<string>();
+        });
+
+        foreach (var role in roles)
+            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+
+        return principal;
+    }
+}
+```
+
+Using such caching greatly reduces the overhead from hitting the database on every request.
+
+***
+
+In short, while `IClaimsTransformation` is called every request, efficient implementation with caching ensures minimal performance impact while keeping role data fresh enough for most applications[1][2].
+
+Sources
+[1] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
+[2] Mapping, customizing, and transforming claims in ASP. ... https://learn.microsoft.com/en-us/aspnet/core/security/authentication/claims?view=aspnetcore-9.0
+
+
