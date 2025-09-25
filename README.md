@@ -380,4 +380,104 @@ Sources
 [1] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
 [2] Mapping, customizing, and transforming claims in ASP. ... https://learn.microsoft.com/en-us/aspnet/core/security/authentication/claims?view=aspnetcore-9.0
 
+## Creating Generic Lookup Methods in EF Core
+
+To make your lookup methods more reusable, you can leverage C# generics in your repository. This allows a single method to handle dropdown options for *any* entity type, as long as you provide a projection (selector) to map entity fields to your `DropdownOption` DTO. This approach reduces code duplication while maintaining type safety and performance[1][2][3].
+
+Key benefits:
+- **Reusability:** One method serves multiple entities (e.g., SubLedgerSystems, Statuses, Categories).
+- **Flexibility:** Pass a lambda expression to define how to map each entity's data to `Value` and `Label`.
+- **Efficiency:** Uses `AsNoTracking()` for read-only queries and projects directly to DTOs[4].
+
+This fits well with your clean architecture setup, keeping the repository in the infrastructure layer.
+
+### Step 1: Define the Interface
+Update your `ILookupRepository` interface to include the generic method. Use `Expression<Func<T, DropdownOption>>` for the selector to ensure it works with EF Core's queryable projections.
+
+```csharp
+public interface ILookupRepository
+{
+    Task<List<DropdownOption>> GetLookupAsync<T>(Expression<Func<T, DropdownOption>> selector) where T : class;
+    // Add other non-generic methods if needed
+}
+```
+
+### Step 2: Implement the Generic Method
+In your `LookupRepository` class, implement the method. It fetches data from the DbSet of type `T`, applies the selector, and adds the default option.
+
+```csharp
+public class LookupRepository : ILookupRepository
+{
+    private readonly OracleDbContext _dbContext;
+
+    public LookupRepository(OracleDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<List<DropdownOption>> GetLookupAsync<T>(Expression<Func<T, DropdownOption>> selector) where T : class
+    {
+        var options = await _dbContext.Set<T>()
+            .AsNoTracking()  // Optimize for read-only
+            .Select(selector)  // Project to DTO
+            .ToListAsync();
+
+        options.Insert(0, new DropdownOption
+        {
+            Value = "-1",
+            Label = "-- Please Select --"
+        });
+
+        return options;
+    }
+}
+```
+
+### Step 3: Usage Example
+In a service or controller, inject `ILookupRepository` and call the method with a specific entity and selector.
+
+```csharp
+// Assuming DropdownOption class
+public class DropdownOption
+{
+    public string Value { get; set; }
+    public string Label { get; set; }
+}
+
+// In a service method
+public async Task<List<DropdownOption>> GetSubLedgerOptionsAsync(ILookupRepository lookupRepository)
+{
+    return await lookupRepository.GetLookupAsync<SubLedgerSystem>(x => new DropdownOption
+    {
+        Value = x.SubLedgerSysId.ToString(),
+        Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}"
+    });
+}
+
+// For another entity, e.g., Status
+public async Task<List<DropdownOption>> GetStatusOptionsAsync(ILookupRepository lookupRepository)
+{
+    return await lookupRepository.GetLookupAsync<Status>(x => new DropdownOption
+    {
+        Value = x.StatusId.ToString(),
+        Label = x.StatusName
+    });
+}
+```
+
+### Additional Tips
+- **Caching:** For static lookups, add caching (e.g., via `IMemoryCache`) to avoid repeated DB calls[23 from previous search].
+- **Parameters:** Extend the method to accept filters (e.g., `Expression<Func<T, bool>> filter`) for dynamic queries like language-specific options[5].
+- **Error Handling:** Wrap in try-catch for DB exceptions, or handle in the calling service.
+- **Limitations:** Generics work best for similar patterns; for complex queries, consider the specification pattern[6].
+
+This keeps your code DRY and scalable. If you need multilingual support or integration with Mapster (from your past queries), let me know for tailored examples!
+
+Sources
+[1] Entity Framework Generic Lookup based on Type https://stackoverflow.com/questions/57044957/entity-framework-generic-lookup-based-on-type
+[2] Using Generics for Lookup Tables in Entity Framework https://damianbrady.com.au/2011/08/16/using-generics-for-lookup-tables-in-entity-framework/
+[3] Entity Framework Core Generic Repository - CodingBlast https://codingblast.com/entity-framework-core-generic-repository/
+[4] Efficient Querying - EF Core https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying
+[5] Repository pattern and localized lookup tables https://stackoverflow.com/questions/20801695/repository-pattern-and-localized-lookup-tables
+[6] Specification Pattern in ASP.NET Core https://codewithmukesh.com/blog/specification-pattern-in-aspnet-core/
 
