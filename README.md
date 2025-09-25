@@ -481,3 +481,108 @@ Sources
 [5] Repository pattern and localized lookup tables https://stackoverflow.com/questions/20801695/repository-pattern-and-localized-lookup-tables
 [6] Specification Pattern in ASP.NET Core https://codewithmukesh.com/blog/specification-pattern-in-aspnet-core/
 
+## Extending Generic Lookup Methods with Filters and Ordering
+
+To add flexibility to your generic lookup method, you can include optional parameters for filtering (e.g., by language or status) and ordering (e.g., by name or ID). This uses `Expression<Func<T, bool>>` for filters to keep queries efficient and composable with EF Core, and `Func<IQueryable<T>, IOrderedQueryable<T>>` for dynamic ordering[1][2][3].
+
+This enhancement allows parameterized queries without duplicating code, aligning with your clean architecture preferences.
+
+### Step 1: Update the Interface
+Modify `ILookupRepository` to accept the new parameters as optional.
+
+```csharp
+using System.Linq.Expressions;
+
+public interface ILookupRepository
+{
+    Task<List<DropdownOption>> GetLookupAsync<T>(
+        Expression<Func<T, DropdownOption>> selector,
+        Expression<Func<T, bool>>? filter = null,
+        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null) where T : class;
+}
+```
+
+### Step 2: Implement the Enhanced Method
+In `LookupRepository`, apply the filter and ordering to the query before projection.
+
+```csharp
+public class LookupRepository : ILookupRepository
+{
+    private readonly OracleDbContext _dbContext;
+
+    public LookupRepository(OracleDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<List<DropdownOption>> GetLookupAsync<T>(
+        Expression<Func<T, DropdownOption>> selector,
+        Expression<Func<T, bool>>? filter = null,
+        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null) where T : class
+    {
+        IQueryable<T> query = _dbContext.Set<T>().AsNoTracking();
+
+        if (filter != null)
+        {
+            query = query.Where(filter);
+        }
+
+        if (orderBy != null)
+        {
+            query = orderBy(query);
+        }
+
+        var options = await query
+            .Select(selector)
+            .ToListAsync();
+
+        options.Insert(0, new DropdownOption
+        {
+            Value = "-1",
+            Label = "-- Please Select --"
+        });
+
+        return options;
+    }
+}
+```
+
+### Step 3: Usage Examples
+Inject `ILookupRepository` and call with filters/ordering as needed.
+
+```csharp
+// Basic usage (no filter or order, same as before)
+var subLedgerOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(x => new DropdownOption
+{
+    Value = x.SubLedgerSysId.ToString(),
+    Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}"
+});
+
+// With filter (e.g., active items only)
+var activeOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
+    selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
+    filter: x => x.IsActive == true
+);
+
+// With ordering (e.g., by description ascending)
+var orderedOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
+    selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
+    orderBy: q => q.OrderBy(x => x.SubLedgerSysDesc)
+);
+
+// Combined filter and ordering (e.g., active items sorted by ID descending)
+var filteredOrderedOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
+    selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
+    filter: x => x.IsActive == true,
+    orderBy: q => q.OrderByDescending(x => x.SubLedgerSysId)
+);
+```
+
+This keeps queries optimized and reusable. For more advanced scenarios like pagination or includes, you can extend further with additional parameters[4][5]. If you need caching or error handling integrated, share more details!
+
+Sources
+[1] Entity Framework Generic repository including properties ... https://stackoverflow.com/questions/53965044/entity-framework-generic-repository-including-properties-through-parameter
+[2] Specification Pattern in ASP.NET Core https://codewithmukesh.com/blog/specification-pattern-in-aspnet-core/
+[3] Gentle introduction to Generic Repository Pattern with C# - ... https://dev.to/karenpayneoregon/gentle-introduction-to-generic-repository-pattern-with-c-1jn0
+[4] Tutorial: Add sorting, filtering, and paging - ASP.NET MVC ... https://learn.microsoft.com/en-us/aspnet/core/data/ef-mvc/sort-filter-page?view=aspnetcore-9.0
+[5] c# - EF Including Other Entities (Generic Repository pattern) https://stackoverflow.com/questions/5376421/ef-including-other-entities-generic-repository-pattern/5376637
