@@ -1,494 +1,11 @@
-Here is a complete, practical example showing how to implement claims-based user context in a Clean Architecture .NET Core Web API project. This includes: claims transformation, context interface, implementation, DI setup, and usage in the core/service layer—while avoiding dependencies on framework types in your Core logic[1][2][3].
+## Extending the Generic Lookup Method for Custom Defaults
 
-***
+Yes, we can easily extend the `GetLookupAsync` method to allow overriding the default option (at position 0) by passing a custom `DropdownOption` from the service layer. This makes the method more flexible for scenarios where the default label/value needs to vary (e.g., "NA" instead of "-- Please Select --"). If no custom default is provided, it falls back to the standard one.
 
-### 1. Define User Context Interface (Core Project)
-```csharp
-// Core Layer (Project.Core)
-public interface ICurrentUser
-{
-    string UserId { get; }
-    IEnumerable<string> Roles { get; }
-    bool IsAuthenticated { get; }
-}
-```
+This fits your clean architecture setup, keeping the repository focused on data access while allowing services to customize UI-specific elements.
 
-***
-
-### 2. Implement User Context (API/Infrastructure Layer)
-```csharp
-// Infrastructure Layer (Project.Infrastructure) or API Layer (Project.API)
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
-
-public class CurrentUser : ICurrentUser
-{
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    public CurrentUser(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
-
-    public string UserId =>
-        _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-    public IEnumerable<string> Roles =>
-        _httpContextAccessor.HttpContext?.User?
-            .FindAll(ClaimTypes.Role)
-            .Select(c => c.Value) 
-            ?? Enumerable.Empty<string>();
-
-    public bool IsAuthenticated =>
-        _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
-}
-```
-You can also implement custom claim access and mapping here if you need extra claims for permissions or other custom attributes[1][2].
-
-***
-
-### 3. Configure Claims Transformation (API Layer)
-Suppose roles are loaded from the database:
-```csharp
-public class CustomClaimsTransformation : IClaimsTransformation
-{
-    private readonly IRoleService _roleService;
-    public CustomClaimsTransformation(IRoleService roleService)
-    {
-        _roleService = roleService;
-    }
-    public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
-    {
-        var identity = (ClaimsIdentity)principal.Identity;
-        var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        var roles = await _roleService.GetRolesForUserAsync(userId);
-        foreach (var role in roles)
-        {
-            if (!identity.HasClaim(ClaimTypes.Role, role))
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
-        }
-        return principal;
-    }
-}
-
-services.AddTransient<IClaimsTransformation, CustomClaimsTransformation>();
-```
-This logic should be in the API project, not inside Core or Infrastructure[2].
-
-***
-
-### 4. Register Everything with DI (API Layer)
-```csharp
-// In Startup.cs or Program.cs
-services.AddHttpContextAccessor();
-services.AddScoped<ICurrentUser, CurrentUser>();
-services.AddScoped<IRoleService, RoleService>();
-services.AddTransient<IClaimsTransformation, CustomClaimsTransformation>();
-```
-This ensures all layers have access to the current user context via DI, and claims are set up for each request correctly[1][2].
-
-***
-
-### 5. Usage in Application/Core/Service Logic
-```csharp
-// Core/Service Layer (Project.Core or Project.Application)
-public class MyService
-{
-    private readonly ICurrentUser _currentUser;
-    public MyService(ICurrentUser currentUser)
-    {
-        _currentUser = currentUser;
-    }
-
-    public void DoBusinessLogic()
-    {
-        var userId = _currentUser.UserId;
-        var roles = _currentUser.Roles;
-
-        // Business logic based on roles
-        if (roles.Contains("Admin"))
-        {
-            // Admin-specific logic
-        }
-    }
-}
-```
-You inject `ICurrentUser` into any service or business logic layer without referencing HttpContext, ClaimsPrincipal, or any framework types[1][3].
-
-***
-
-### Key Architecture Principles
-- **ICurrentUser** interface is in Core (no framework dependency).
-- API layer sets up claims and implements the interface (using IHttpContextAccessor).
-- All service/business logic depends only on ICurrentUser, not on external web types.
-- Claims transformation and retrieval are handled on the web/API boundary[1][2][3].
-
-This approach is scalable, clean, and fully in line with Clean Architecture best practices for ASP.NET Core projects[1][2][3].
-
-Sources
-[1] Getting the Current User in Clean Architecture https://www.milanjovanovic.tech/blog/getting-the-current-user-in-clean-architecture
-[2] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
-[3] Clean Architecture and Asp.Net Core Identity https://stackoverflow.com/questions/62865530/clean-architecture-and-asp-net-core-identity
-
-
---------
-Here is a full implementation example of using `IClaimsTransformation` in your Clean Architecture project structure (API, Core, Infrastructure) to load user roles from the database and add them as claims:
-
-***
-
-### 1. Define User Entity and Role Service (Infrastructure Layer)
-
-```csharp
-// Infrastructure/Entities/User.cs
-public class User
-{
-    public string UserId { get; set; }
-    public string UserName { get; set; }
-    public List<string> Roles { get; set; }
-}
-
-// Infrastructure/Services/UserRepository.cs
-public interface IUserRepository
-{
-    Task<User> GetUserByUserNameAsync(string userName);
-}
-
-public class UserRepository : IUserRepository
-{
-    // Implement database fetch logic here
-    public async Task<User> GetUserByUserNameAsync(string userName)
-    {
-        // Fetch user with roles from DB, example only
-        return new User
-        {
-            UserId = "123",
-            UserName = userName,
-            Roles = new List<string> { "Admin", "User" }
-        };
-    }
-}
-```
-
-***
-
-### 2. Create Claims Transformation (API Layer)
-
-```csharp
-// API/Services/DbClaimsTransformation.cs
-using Microsoft.AspNetCore.Authentication;
-
-public class DbClaimsTransformation : IClaimsTransformation
-{
-    private readonly IUserRepository _userRepository;
-
-    public DbClaimsTransformation(IUserRepository userRepository)
-    {
-        _userRepository = userRepository;
-    }
-
-    public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
-    {
-        var identity = (ClaimsIdentity)principal.Identity;
-        var userName = principal.Identity?.Name;
-
-        if (!string.IsNullOrEmpty(userName) && !identity.HasClaim(c => c.Type == ClaimTypes.Role))
-        {
-            var user = await _userRepository.GetUserByUserNameAsync(userName);
-            
-            if (user?.Roles != null)
-            {
-                foreach (var role in user.Roles)
-                {
-                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
-                }
-            }
-        }
-        return principal;
-    }
-}
-```
-
-***
-
-### 3. Implement User Context Abstraction (Core Project)
-
-```csharp
-// Core/Interfaces/ICurrentUser.cs
-public interface ICurrentUser
-{
-    string UserId { get; }
-    IEnumerable<string> Roles { get; }
-    bool IsAuthenticated { get; }
-}
-```
-
-***
-
-### 4. Implement User Context (Infrastructure or API Layer)
-
-```csharp
-// Infrastructure/Services/CurrentUser.cs
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
-
-public class CurrentUser : ICurrentUser
-{
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public CurrentUser(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
-
-    public string UserId => _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-    public IEnumerable<string> Roles =>
-        _httpContextAccessor.HttpContext?.User?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? Enumerable.Empty<string>();
-
-    public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
-}
-```
-
-***
-
-### 5. Register Dependencies in API Startup
-
-```csharp
-// API/Program.cs or Startup.cs (ConfigureServices)
-services.AddHttpContextAccessor();
-services.AddScoped<IUserRepository, UserRepository>();
-services.AddScoped<ICurrentUser, CurrentUser>();
-services.AddTransient<IClaimsTransformation, DbClaimsTransformation>();
-```
-
-***
-
-### 6. Usage Example in Core Service
-
-```csharp
-// Core/Services/MyService.cs
-public class MyService
-{
-    private readonly ICurrentUser _currentUser;
-
-    public MyService(ICurrentUser currentUser)
-    {
-        _currentUser = currentUser;
-    }
-
-    public void ExecuteBusinessLogic()
-    {
-        if (_currentUser.IsAuthenticated)
-        {
-            var roles = _currentUser.Roles;
-
-            if (roles.Contains("Admin"))
-            {
-                // Admin-specific logic here
-            }
-        }
-    }
-}
-```
-
-***
-
-### Summary:
-
-- Your **API layer** hosts the actual `IClaimsTransformation` implementation that queries the database for user roles.
-- Your **Infrastructure layer** implements user data access (repository) and the user context wrapper (`CurrentUser`).
-- Your **Core layer** defines only the `ICurrentUser` interface and depends on it in your business logic.
-- This clean separation aligns well with your project structure and Clean Architecture principles.
-
-This setup makes your app flexible, testable, and neatly separates concerns across layers[1][2][3].
-
-Sources
-[1] Getting the Current User in Clean Architecture https://www.milanjovanovic.tech/blog/getting-the-current-user-in-clean-architecture
-[2] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
-[3] Clean Architecture and Asp.Net Core Identity https://stackoverflow.com/questions/62865530/clean-architecture-and-asp-net-core-identity
-
-
-
-Done !
-Yes, since `IClaimsTransformation.TransformAsync` runs on every authenticated request, it can have a performance impact if the logic inside (such as querying the database for user roles) is expensive or not optimized.
-
-### Performance Considerations
-
-- **Database Calls:** Querying roles/permissions from the database on every request adds latency and load, especially if the user makes many requests in a session.
-- **Claims Caching:** To avoid repeated database hits, it is common to:
-  - Cache user roles/permissions in a distributed cache (e.g., Redis, MemoryCache) keyed by user ID.
-  - Retrieve roles from cache in `TransformAsync`, only querying the DB on cache misses.
-- **Claims Persistence:** Many apps use tokens like JWTs where roles/permissions are serialized in the token itself, avoiding database fetch on each request.
-- **Balance Freshness and Performance:** If roles change infrequently, caching claims for some configurable duration improves performance without sacrificing correctness.
-- **Asynchronous Calls:** Because `TransformAsync` is async, it can be awaited efficiently to reduce blocking.
-
-### Summary
-
-| Aspect                   | Advice                                  |
-|--------------------------|-----------------------------------------|
-| Cost per request          | Moderate if DB calls are expensive      |
-| Mitigation               | Use caching for user roles/permissions  |
-| Alternative approaches   | JWT tokens with embedded roles           |
-| Tradeoff                 | Freshness of roles vs. request performance|
-
-***
-
-### Practical Optimization Example
-
-```csharp
-public class CachedClaimsTransformation : IClaimsTransformation
-{
-    private readonly IUserRepository _userRepository;
-    private readonly IMemoryCache _cache;
-
-    public CachedClaimsTransformation(IUserRepository userRepository, IMemoryCache cache)
-    {
-        _userRepository = userRepository;
-        _cache = cache;
-    }
-
-    public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
-    {
-        var identity = (ClaimsIdentity)principal.Identity;
-        var userName = principal.Identity?.Name;
-
-        if (string.IsNullOrEmpty(userName) || identity.HasClaim(c => c.Type == ClaimTypes.Role))
-            return principal;
-
-        var roles = await _cache.GetOrCreateAsync($"UserRoles-{userName}", async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
-            var user = await _userRepository.GetUserByUserNameAsync(userName);
-            return user?.Roles ?? new List<string>();
-        });
-
-        foreach (var role in roles)
-            identity.AddClaim(new Claim(ClaimTypes.Role, role));
-
-        return principal;
-    }
-}
-```
-
-Using such caching greatly reduces the overhead from hitting the database on every request.
-
-***
-
-In short, while `IClaimsTransformation` is called every request, efficient implementation with caching ensures minimal performance impact while keeping role data fresh enough for most applications[1][2].
-
-Sources
-[1] Master Claims Transformation for Flexible ASP.NET Core ... https://www.milanjovanovic.tech/blog/master-claims-transformation-for-flexible-aspnetcore-authorization
-[2] Mapping, customizing, and transforming claims in ASP. ... https://learn.microsoft.com/en-us/aspnet/core/security/authentication/claims?view=aspnetcore-9.0
-
-## Creating Generic Lookup Methods in EF Core
-
-To make your lookup methods more reusable, you can leverage C# generics in your repository. This allows a single method to handle dropdown options for *any* entity type, as long as you provide a projection (selector) to map entity fields to your `DropdownOption` DTO. This approach reduces code duplication while maintaining type safety and performance[1][2][3].
-
-Key benefits:
-- **Reusability:** One method serves multiple entities (e.g., SubLedgerSystems, Statuses, Categories).
-- **Flexibility:** Pass a lambda expression to define how to map each entity's data to `Value` and `Label`.
-- **Efficiency:** Uses `AsNoTracking()` for read-only queries and projects directly to DTOs[4].
-
-This fits well with your clean architecture setup, keeping the repository in the infrastructure layer.
-
-### Step 1: Define the Interface
-Update your `ILookupRepository` interface to include the generic method. Use `Expression<Func<T, DropdownOption>>` for the selector to ensure it works with EF Core's queryable projections.
-
-```csharp
-public interface ILookupRepository
-{
-    Task<List<DropdownOption>> GetLookupAsync<T>(Expression<Func<T, DropdownOption>> selector) where T : class;
-    // Add other non-generic methods if needed
-}
-```
-
-### Step 2: Implement the Generic Method
-In your `LookupRepository` class, implement the method. It fetches data from the DbSet of type `T`, applies the selector, and adds the default option.
-
-```csharp
-public class LookupRepository : ILookupRepository
-{
-    private readonly OracleDbContext _dbContext;
-
-    public LookupRepository(OracleDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<List<DropdownOption>> GetLookupAsync<T>(Expression<Func<T, DropdownOption>> selector) where T : class
-    {
-        var options = await _dbContext.Set<T>()
-            .AsNoTracking()  // Optimize for read-only
-            .Select(selector)  // Project to DTO
-            .ToListAsync();
-
-        options.Insert(0, new DropdownOption
-        {
-            Value = "-1",
-            Label = "-- Please Select --"
-        });
-
-        return options;
-    }
-}
-```
-
-### Step 3: Usage Example
-In a service or controller, inject `ILookupRepository` and call the method with a specific entity and selector.
-
-```csharp
-// Assuming DropdownOption class
-public class DropdownOption
-{
-    public string Value { get; set; }
-    public string Label { get; set; }
-}
-
-// In a service method
-public async Task<List<DropdownOption>> GetSubLedgerOptionsAsync(ILookupRepository lookupRepository)
-{
-    return await lookupRepository.GetLookupAsync<SubLedgerSystem>(x => new DropdownOption
-    {
-        Value = x.SubLedgerSysId.ToString(),
-        Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}"
-    });
-}
-
-// For another entity, e.g., Status
-public async Task<List<DropdownOption>> GetStatusOptionsAsync(ILookupRepository lookupRepository)
-{
-    return await lookupRepository.GetLookupAsync<Status>(x => new DropdownOption
-    {
-        Value = x.StatusId.ToString(),
-        Label = x.StatusName
-    });
-}
-```
-
-### Additional Tips
-- **Caching:** For static lookups, add caching (e.g., via `IMemoryCache`) to avoid repeated DB calls[23 from previous search].
-- **Parameters:** Extend the method to accept filters (e.g., `Expression<Func<T, bool>> filter`) for dynamic queries like language-specific options[5].
-- **Error Handling:** Wrap in try-catch for DB exceptions, or handle in the calling service.
-- **Limitations:** Generics work best for similar patterns; for complex queries, consider the specification pattern[6].
-
-This keeps your code DRY and scalable. If you need multilingual support or integration with Mapster (from your past queries), let me know for tailored examples!
-
-Sources
-[1] Entity Framework Generic Lookup based on Type https://stackoverflow.com/questions/57044957/entity-framework-generic-lookup-based-on-type
-[2] Using Generics for Lookup Tables in Entity Framework https://damianbrady.com.au/2011/08/16/using-generics-for-lookup-tables-in-entity-framework/
-[3] Entity Framework Core Generic Repository - CodingBlast https://codingblast.com/entity-framework-core-generic-repository/
-[4] Efficient Querying - EF Core https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying
-[5] Repository pattern and localized lookup tables https://stackoverflow.com/questions/20801695/repository-pattern-and-localized-lookup-tables
-[6] Specification Pattern in ASP.NET Core https://codewithmukesh.com/blog/specification-pattern-in-aspnet-core/
-
-## Extending Generic Lookup Methods with Filters and Ordering
-
-To add flexibility to your generic lookup method, you can include optional parameters for filtering (e.g., by language or status) and ordering (e.g., by name or ID). This uses `Expression<Func<T, bool>>` for filters to keep queries efficient and composable with EF Core, and `Func<IQueryable<T>, IOrderedQueryable<T>>` for dynamic ordering[1][2][3].
-
-This enhancement allows parameterized queries without duplicating code, aligning with your clean architecture preferences.
-
-### Step 1: Update the Interface
-Modify `ILookupRepository` to accept the new parameters as optional.
+### Updated Interface
+Add an optional `defaultOption` parameter.
 
 ```csharp
 using System.Linq.Expressions;
@@ -498,12 +15,13 @@ public interface ILookupRepository
     Task<List<DropdownOption>> GetLookupAsync<T>(
         Expression<Func<T, DropdownOption>> selector,
         Expression<Func<T, bool>>? filter = null,
-        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null) where T : class;
+        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null,
+        DropdownOption? defaultOption = null) where T : class;
 }
 ```
 
-### Step 2: Implement the Enhanced Method
-In `LookupRepository`, apply the filter and ordering to the query before projection.
+### Updated Implementation
+In `LookupRepository`, use the passed `defaultOption` if provided; otherwise, use the fallback.
 
 ```csharp
 public class LookupRepository : ILookupRepository
@@ -518,7 +36,8 @@ public class LookupRepository : ILookupRepository
     public async Task<List<DropdownOption>> GetLookupAsync<T>(
         Expression<Func<T, DropdownOption>> selector,
         Expression<Func<T, bool>>? filter = null,
-        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null) where T : class
+        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null,
+        DropdownOption? defaultOption = null) where T : class
     {
         IQueryable<T> query = _dbContext.Set<T>().AsNoTracking();
 
@@ -536,53 +55,205 @@ public class LookupRepository : ILookupRepository
             .Select(selector)
             .ToListAsync();
 
-        options.Insert(0, new DropdownOption
+        // Insert custom default if provided; otherwise, use fallback
+        var insertOption = defaultOption ?? new DropdownOption
         {
             Value = "-1",
             Label = "-- Please Select --"
-        });
+        };
+        options.Insert(0, insertOption);
 
         return options;
     }
 }
 ```
 
-### Step 3: Usage Examples
-Inject `ILookupRepository` and call with filters/ordering as needed.
+### Usage Example with Custom Default
+From a service, pass a custom default.
 
 ```csharp
-// Basic usage (no filter or order, same as before)
-var subLedgerOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(x => new DropdownOption
-{
-    Value = x.SubLedgerSysId.ToString(),
-    Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}"
-});
+// In a service method
+var customDefault = new DropdownOption { Value = "NA", Label = "Not Applicable" };
 
-// With filter (e.g., active items only)
-var activeOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
+var options = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
     selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
-    filter: x => x.IsActive == true
-);
-
-// With ordering (e.g., by description ascending)
-var orderedOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
-    selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
-    orderBy: q => q.OrderBy(x => x.SubLedgerSysDesc)
-);
-
-// Combined filter and ordering (e.g., active items sorted by ID descending)
-var filteredOrderedOptions = await lookupRepository.GetLookupAsync<SubLedgerSystem>(
-    selector: x => new DropdownOption { Value = x.SubLedgerSysId.ToString(), Label = $"{x.SubLedgerSysId}--{x.SubLedgerSysDesc}" },
-    filter: x => x.IsActive == true,
-    orderBy: q => q.OrderByDescending(x => x.SubLedgerSysId)
+    defaultOption: customDefault
 );
 ```
 
-This keeps queries optimized and reusable. For more advanced scenarios like pagination or includes, you can extend further with additional parameters[4][5]. If you need caching or error handling integrated, share more details!
+This overrides the position 0 with your custom value/label[1][2].
+
+## Handling SQL Union for Defaults in a Generic Method
+
+Your SQL example (`SELECT GROUP_ID, CAST(ORDER_NUM AS VARCHAR(10)) ORDER_NUM FROM BIS_SETUP_GROUP WHERE APPL_NAME = 'ACH' UNION SELECT 'NA', '' FROM DUAL ORDER BY ORDER_NUM`) adds a default row ("NA", "") via UNION with DUAL (Oracle-specific) and orders the result. This is common for Oracle queries to include defaults directly in SQL.
+
+To make this generic in EF Core:
+- Use raw SQL queries via `FromSqlRaw` for complex unions that aren't easily expressible in LINQ.
+- Keep it generic by parameterizing the entity type, SQL template, and parameters.
+- Since unions with DUAL aren't native to LINQ, a generic method can build and execute the raw SQL, projecting to `DropdownOption`.
+
+This approach centralizes such queries in your repository while allowing reuse[3][4].
+
+### Generic Method for Union-Based Lookups
+Add this to `ILookupRepository` and `LookupRepository`. It takes a base SQL query, union clause, and ordering, then executes and projects.
+
+```csharp
+// In ILookupRepository
+Task<List<DropdownOption>> GetUnionLookupAsync<T>(
+    string baseSql,
+    string unionSql,
+    string orderByClause,
+    object? parameters = null,
+    Expression<Func<T, DropdownOption>>? selector = null) where T : class;
+
+// In LookupRepository
+public async Task<List<DropdownOption>> GetUnionLookupAsync<T>(
+    string baseSql,
+    string unionSql,
+    string orderByClause,
+    object? parameters = null,
+    Expression<Func<T, DropdownOption>>? selector = null) where T : class
+{
+    var fullSql = $"{baseSql} UNION {unionSql} ORDER BY {orderByClause}";
+
+    var query = _dbContext.Set<T>().FromSqlRaw(fullSql, parameters ?? new object[0]);
+
+    // If a selector is provided, project; otherwise, assume raw results map directly
+    var results = selector != null
+        ? await query.Select(selector).ToListAsync()
+        : await query.Select(x => new DropdownOption { Value = /* Map fields accordingly */ }).ToListAsync();  // Customize mapping
+
+    return results;
+}
+```
+
+### Usage Example for Your SQL
+Adapt your query; no need for manual insertion since the union adds the default.
+
+```csharp
+// In a service
+var baseSql = "SELECT GROUP_ID, CAST(ORDER_NUM AS VARCHAR(10)) AS ORDER_NUM FROM BIS_SETUP_GROUP WHERE APPL_NAME = {0}";
+var unionSql = "SELECT 'NA', '' FROM DUAL";
+var orderByClause = "ORDER_NUM";
+
+var options = await lookupRepository.GetUnionLookupAsync<BisSetupGroup>(
+    baseSql: baseSql,
+    unionSql: unionSql,
+    orderByClause: orderByClause,
+    parameters: new object[] { "ACH" },  // Parameterize to avoid injection
+    selector: x => new DropdownOption { Value = x.GroupId.ToString(), Label = x.OrderNum }
+);
+```
+
+### Tips for Union Cases
+- **Security:** Always parameterize inputs to prevent SQL injection[4].
+- **Projection:** If the union doesn't match the entity exactly, use a non-entity type or raw SQL results[5].
+- **Performance:** Raw SQL bypasses some EF optimizations; use sparingly for complex cases[6].
+- **Alternatives:** If possible, stick to LINQ for better type safety; reserve raw SQL for Oracle-specific needs like DUAL unions.
+
+This keeps your repository versatile. If your SQL needs more customization or you have the entity definitions, I can refine further!
 
 Sources
-[1] Entity Framework Generic repository including properties ... https://stackoverflow.com/questions/53965044/entity-framework-generic-repository-including-properties-through-parameter
-[2] Specification Pattern in ASP.NET Core https://codewithmukesh.com/blog/specification-pattern-in-aspnet-core/
-[3] Gentle introduction to Generic Repository Pattern with C# - ... https://dev.to/karenpayneoregon/gentle-introduction-to-generic-repository-pattern-with-c-1jn0
-[4] Tutorial: Add sorting, filtering, and paging - ASP.NET MVC ... https://learn.microsoft.com/en-us/aspnet/core/data/ef-mvc/sort-filter-page?view=aspnetcore-9.0
-[5] c# - EF Including Other Entities (Generic Repository pattern) https://stackoverflow.com/questions/5376421/ef-including-other-entities-generic-repository-pattern/5376637
+[1] Custom default value for generic parameter https://stackoverflow.com/questions/42844928/custom-default-value-for-generic-parameter
+[2] ASP.NET MVC - Populating Dropdown Lists in Razor ... https://www.pluralsight.com/resources/blog/guides/asp-net-mvc-populating-dropdown-lists-in-razor-views-using-the-mvvm-design-pattern-entity-framework-and-ajax
+[3] Generic Repository Pattern In ASP.NET Core https://www.c-sharpcorner.com/article/generic-repository-pattern-in-asp-net-core/
+[4] Entity Framework Core Integration | ABP.IO Documentation https://abp.io/docs/latest/framework/data/entity-framework-core
+[5] Value Conversions - EF Core https://learn.microsoft.com/en-us/ef/core/modeling/value-conversions
+[6] Efficient Querying - EF Core https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying
+
+
+
+## Reusing Queries for BIS_SETUP_GROUP with Variable APPL_NAME in EF Core
+
+Since you're reusing the query on `BIS_SETUP_GROUP` where the only variation is the `APPL_NAME` filter (e.g., 'ACH' in one case, something else in another), and you want to stick to pure EF Core (no raw SQL), we can leverage the existing generic `GetLookupAsync` method. This method already supports dynamic filters via `Expression<Func<T, bool>>`, so we can pass the APPL_NAME as part of the filter.
+
+To mimic your SQL (filtering by APPL_NAME, adding a default like 'NA' with empty ORDER_NUM, projecting GROUP_ID and ORDER_NUM, and ordering by ORDER_NUM):
+- Use the filter parameter to specify `APPL_NAME`.
+- Pass a custom default option ('NA', '').
+- Handle projection in the selector (cast ORDER_NUM to string via `ToString()` in LINQ).
+- For ordering, use the `orderBy` parameter to sort by ORDER_NUM before materializing the list.
+- The default is inserted at position 0 *after* querying and ordering, so if you need it sorted into the list (e.g., based on empty ORDER_NUM appearing first), sort in memory after insertion.
+
+This keeps everything in EF Core LINQ for type safety and portability[1][2][3].
+
+### Assumptions
+- Your entity is something like `BisSetupGroup` with properties `GroupId` (string/int), `OrderNum` (int/decimal), and `ApplName` (string).
+- `DropdownOption` has `Value` and `Label` (both strings).
+- The default ('NA', '') should appear first, assuming empty ORDER_NUM sorts before others.
+
+### Usage Example with Variable APPL_NAME
+In a service, call the generic method with the desired APPL_NAME as a filter. Here's how to reuse it for different cases:
+
+```csharp
+// In a service method (e.g., for APPL_NAME = "ACH")
+var applName = "ACH";  // This can be a variable or parameter
+
+var customDefault = new DropdownOption { Value = "NA", Label = "" };
+
+var options = await lookupRepository.GetLookupAsync<BisSetupGroup>(
+    selector: x => new DropdownOption 
+    { 
+        Value = x.GroupId.ToString(), 
+        Label = x.OrderNum.ToString()  // EF Core handles ToString() for casting to varchar
+    },
+    filter: x => x.ApplName == applName,  // Dynamic filter based on variable APPL_NAME
+    orderBy: q => q.OrderBy(x => x.OrderNum),  // Order by ORDER_NUM ascending
+    defaultOption: customDefault  // Inserts 'NA' with empty Label at position 0
+);
+
+// For a different APPL_NAME (e.g., "XYZ")
+applName = "XYZ";
+var optionsXyz = await lookupRepository.GetLookupAsync<BisSetupGroup>(
+    selector: x => new DropdownOption 
+    { 
+        Value = x.GroupId.ToString(), 
+        Label = x.OrderNum.ToString()
+    },
+    filter: x => x.ApplName == applName,
+    orderBy: q => q.OrderBy(x => x.OrderNum),
+    defaultOption: customDefault
+);
+```
+
+- **How it works:**
+  - **Filter Reuse:** The `filter` lambda changes based on the `applName` variable, making the query reusable without code duplication[2][3].
+  - **Projection:** `ToString()` in the selector mimics `CAST AS VARCHAR(10)` – EF Core translates this efficiently[4].
+  - **Default Insertion:** Handled via the `defaultOption` parameter, added at position 0 after querying[5].
+  - **Ordering:** Applied via `orderBy` before executing the query, ensuring efficient database-side sorting[6]. If the default needs to be sorted into the list (e.g., empty Label first), you can sort the final `options` list in memory:
+    ```csharp
+    options = options.OrderBy(o => o.Label).ToList();  // In-memory sort after insertion
+    ```
+
+This generates optimized SQL like:
+```
+SELECT b."GroupId", b."OrderNum"  -- Projected fields
+FROM "BisSetupGroup" AS b
+WHERE b."ApplName" = 'ACH'  -- Dynamic filter
+ORDER BY b."OrderNum"  -- Database ordering
+```
+EF Core parameterizes the filter to prevent SQL injection[3].
+
+### If Ordering Needs to Include the Default
+If you want the default sorted naturally (e.g., empty Label first in the ordered list), insert it after querying but before final in-memory sorting:
+```csharp
+// After the await
+options.Insert(0, customDefault);  // Already done in the method
+options = options.OrderBy(o => string.IsNullOrEmpty(o.Label) ? "" : o.Label).ToList();  // Custom in-memory sort
+```
+
+### Tips
+- **Performance:** For large datasets, ensure `ApplName` and `OrderNum` are indexed in your database for fast filtering/ordering[4][7].
+- **No Raw SQL Needed:** This avoids Oracle-specific features like DUAL/UNION, keeping it portable across databases[1].
+- **Extensibility:** If you need more variations (e.g., different defaults per APPL_NAME), pass them dynamically from the service.
+
+This approach keeps your code DRY and EF Core-centric. If your entity properties differ or you need pagination, provide more details for adjustments!
+
+Sources
+[1] Global Query Filters - EF Core https://learn.microsoft.com/en-us/ef/core/querying/filters
+[2] EF Core 3.1 - how to do filtering based on parameters? https://stackoverflow.com/questions/59714358/ef-core-3-1-how-to-do-filtering-based-on-parameters
+[3] EF Core Where - C# Tutorial https://www.csharptutorial.net/entity-framework-core-tutorial/ef-core-where/
+[4] Efficient Querying - EF Core https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying
+[5] Custom default value for generic parameter https://stackoverflow.com/questions/42844928/custom-default-value-for-generic-parameter
+[6] Tutorial: Add sorting, filtering, and paging - ASP.NET MVC ... https://learn.microsoft.com/en-us/aspnet/core/data/ef-mvc/sort-filter-page?view=aspnetcore-9.0
+[7] Advanced Performance Topics - EF Core https://learn.microsoft.com/en-us/ef/core/performance/advanced-performance-topics
+
