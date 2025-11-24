@@ -1,35 +1,98 @@
-Here's the revised email with a proper request tone that sounds natural and human:
+#=========================
+# CONFIG SECTION
+#=========================
+$vaultBaseUrl    = "https://example.vault.com"
+$vaultOneTimeUri = "$vaultBaseUrl"
+$xVaultToken     = "1234"          # One-time token from portal
+$appRole         = "ZS123"         # Update based on your setup
+$secretIdFile    = "C:\Secure\secret_id.txt"
+$textFilePath    = "C:\Secure\vault_passwords.txt"  # Output file for testing
+$domain          = "oracle"
+$serviceId       = "sass_owner"    # Update accordingly
 
-***
+#=========================
+# STEP 1: GET SECRET ID with One-Time Token
+#=========================
+Function Get-SecretId {
+    if (Test-Path $secretIdFile) {
+        Write-Host "Secret ID already exists, using saved value."
+        return Get-Content $secretIdFile
+    } else {
+        $Params = @{
+            Method  = "Post"
+            Uri     = $vaultBaseUrl
+            Headers = @{ "x-vault-token" = $xVaultToken }
+        }
+        $resp = Invoke-RestMethod @Params
+        $data = $resp.data
+        
+        if ($data -is [string]) {
+            if ($data -match "secret_id\s*=\s*([^\;]+);") {
+                $secretId = $Matches[1].Trim()
+            } elseif ($data.secret_id) {
+                $secretId = $data.secret_id
+            } else {
+                throw "Secret_id not found."
+            }
+        } elseif ($data.secret_id) {
+            $secretId = $data.secret_id
+        } else {
+            throw "Secret_id not present in response"
+        }
+        Set-Content -Path $secretIdFile -Value $secretId
+        Write-Host "New Secret ID acquired and saved."
+        return $secretId
+    }
+}
 
-**Subject:** Request to Work from Home Next Week
+#=========================
+# STEP 2: GET CLIENT TOKEN using Secret ID
+#=========================
+Function Get-ClientToken($role_id, $secret_id) {
+    $login = "auth/approle/login"
+    $URL = "$vaultBaseUrl/v1/$login"
+    $body = @{
+        "role_id"   = $role_id
+        "secret_id" = $secret_id
+    }
+    $bodyJson = $body | ConvertTo-Json
+    $res = Invoke-RestMethod -Uri $URL -Method Post -Body $bodyJson
+    $token = $res.auth.client_token
+    Write-Host "Client token acquired."
+    return $token
+}
 
-Hi [Manager's Name],
+#=========================
+# STEP 3: Retrieve Secret (Database Password)
+#=========================
+Function Get-DbPassword($clientToken, $domain, $serviceId) {
+    $adPasswdsEP = "secrets/database/$domain/static-creds/$serviceId"
+    $URL = "$vaultBaseUrl/v1/$adPasswdsEP"
+    $headers = @{ "x-vault-token" = $clientToken }
+    $res = Invoke-RestMethod -Uri $URL -Method Get -Headers $headers
+    $password = $res.data.password
+    Write-Host "Password retrieved for $domain/$serviceId"
+    return $password
+}
 
-I hope you're doing well. I'm writing to request if I could please work from home for the whole of next week.
+#=========================
+# STEP 4: Write to TEST Output Text File
+#=========================
+Function Write-PasswordTextFile($oraclePassword, $sqlPassword) {
+    $output = @"
+Oracle password: $oraclePassword
+SQL password: $sqlPassword
+"@
+    Set-Content -Path $textFilePath -Value $output
+    Write-Host "Passwords written to test text file: $textFilePath"
+}
 
-Both my sons tested positive for typhoid yesterday, and now my wife and mother are also showing the same symptoms. The whole family is sick right now, so I need to be at home to take care of them and manage things.
+#=========================
+# RUN THE WORKFLOW
+#=========================
+$secretId = Get-SecretId
+$clientToken = Get-ClientToken $appRole $secretId
+$oraclePassword = Get-DbPassword $clientToken "oracle" $serviceId
+$sqlPassword = Get-DbPassword $clientToken "ms-sql" $serviceId # If you want to test multiple
 
-I will make sure to be online during regular work hours and stay available for all meetings and calls. My work won't get affected, and I'll complete everything on time.
-
-Could you please let me know if this would be okay? I can share medical reports if you need them.
-
-Thank you so much for your understanding and support.
-
-Regards,  
-Karthick
-
-***
-
-This version has a clear request tone with phrases like "I'm writing to request if I could please" and "Could you please let me know if this would be okay?" It sounds more humble and polite, like you're genuinely asking for permission rather than just informing. The language stays simple and natural - the way a real person would write to their manager when they need help with a family emergency.
-
-Sources
-[1] 5 great work from home request email templates to copy & paste https://flodesk.com/tips/work-from-home-request-email-templates
-[2] 6 Email Examples for Asking Your Boss To Work From Home - Indeed https://www.indeed.com/career-advice/career-development/email-message-example-asking-to-work-from-home
-[3] Work From Home Request Email with Samples (2025) - Hirist https://www.hirist.tech/blog/work-from-home-request-email-with-sample/
-[4] Requesting Work From Home: 18 Email Templates - Buildremote https://buildremote.co/remote-work/requesting-work-from-home-emails/
-[5] How to Write a Work From Home Request Email Professionally https://jobifyindia.com/blog/work-from-home-request-email/
-[6] Work from Home Request Email Template - SurveySparrow https://surveysparrow.com/hr-tool-kit/work-from-home-request-email/
-[7] How to Write a Work From Home Request Email in 2025? https://www.pitchnhire.com/blog/work-from-home-request-email
-[8] How to Write a Work From Home Request Email - 4 Corner Resources https://www.4cornerresources.com/career-advice/work-from-home-request/
-[9] Ultimate Work From Home Request Email with 6 Keys - Chegg India https://www.cheggindia.com/career-guidance/work-from-home-request-email/
+Write-PasswordTextFile $oraclePassword $sqlPassword
